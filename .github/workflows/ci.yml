@@ -27,3 +27,28 @@ jobs:
 
       - name: Build and validate Worker bundle
         run: npm run check
+
+  powershell-bootstrap-syntax:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse bootstrap helper with Windows PowerShell
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path '.\scripts\bootstrap-cloudflare.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
+          Write-Host 'PowerShell bootstrap syntax PASS'
