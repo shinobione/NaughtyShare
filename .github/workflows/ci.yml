@@ -52,3 +52,7 @@ jobs:
           }
 
           Write-Host 'PowerShell bootstrap syntax PASS'
+
+      - name: Exercise native stderr capture regression
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap-cloudflare.ps1 -NativeCaptureSelfTest
