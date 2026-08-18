@@ -23,50 +23,53 @@ Intended import flow:
 
 Google Photos Picker URLs are temporary and are not used as permanent storage.
 
-## Target architecture
+## Architecture
 
 ```text
-Google Photos
+Cloudflare Access
     |
-    | explicit Picker selection
+    | exact-email policy + verified JWT
     v
-NaughtyShare PWA
+NaughtyShare Worker + static PWA
+    |-- JWT signature/AUD/issuer validation
+    |-- second exact-email allowlist
     |
-    | authenticated import / API
-    v
-Private API / edge backend
-    |-- private object storage: original photos + videos
-    |-- metadata store: media index, captions, timestamps
-    `-- authorization: exactly the allowed users
+    +--> private R2 bucket       original photo/video bytes
+    |
+    `--> D1 database             media index and ownership metadata
 ```
 
-### Frontend
+Google Photos Picker will plug into the same authenticated import API during Phase 2.
 
-- Installable PWA
-- Mobile-first gallery
-- Photo viewer
-- Video player
-- Upload/import screen
-- Favorites / captions later
-- No secret embedded in client JavaScript
+### Privacy boundary
 
-### Backend
+- The GitHub repository contains code and documentation only.
+- R2 is private and must not expose an `r2.dev` or public custom-domain endpoint.
+- `/api/*` and `/media/*` are handled by the authenticated Worker.
+- Private media responses use `Cache-Control: private, no-store`.
+- The PWA service worker explicitly refuses to cache `/api/*` and `/media/*`.
+- No analytics or third-party trackers are present.
+- Cloudflare Access JWTs are signature-validated by the Worker; an email header alone is never trusted.
+- Exact authorized emails are checked a second time in the Worker through `ALLOWED_EMAILS`.
 
-Recommended deployment target: Cloudflare Worker + private R2 bucket, with application access restricted to the two approved identities. The repository remains source code only.
+## Current implementation — v0.2.0
 
-## Security requirements
+The `feat/secure-vault` branch contains the first Secure Vault implementation:
 
-- Deny access by default.
-- Only explicitly allow the two intended identities.
-- Never expose the R2/object-storage bucket publicly.
-- Never store permanent public media URLs.
-- Serve media only after authorization.
-- Prefer same-origin API/media delivery.
-- Strip unnecessary location metadata on import where practical.
-- No analytics or third-party trackers on private gallery pages.
-- No media content in Git history, Actions artifacts, logs or screenshots.
-- OAuth tokens are transient and must never be persisted in logs or the repository.
-- Secrets are environment/deployment secrets, never source-controlled values.
+- Cloudflare Worker backend.
+- Cloudflare Access JWT validation using `jose`.
+- Exact two-user allowlist support.
+- Private R2 media storage binding.
+- D1 media metadata index.
+- Authenticated gallery listing.
+- Authenticated image/video streaming with byte-range support.
+- Direct device upload for images and videos up to 95 MB per file.
+- Streamed uploads: media is not buffered into Worker memory.
+- R2 rollback when D1 metadata commit fails.
+- CSP, frame denial, referrer and browser-permission headers for static assets.
+- GitHub CI build + Wrangler dry-run validation.
+
+The code is **not production-active until the Cloudflare resources, Access application, exact emails, AUD and team domain are configured**. See [`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
 ## Planned phases
 
@@ -75,14 +78,20 @@ Recommended deployment target: Cloudflare Worker + private R2 bucket, with appli
 - [x] Define privacy boundary
 - [x] Document Google Photos Locked Folder limitation
 - [x] PWA shell + manifest + offline app shell
-- [ ] Private API skeleton
+- [x] Private API skeleton
 
 ### Phase 1 — Secure vault
-- [ ] Two-user authentication/authorization
-- [ ] Private object storage
-- [ ] Media metadata index
-- [ ] Authenticated photo/video streaming
-- [ ] Upload from device
+- [x] Cloudflare Access JWT verification in Worker
+- [x] Second exact-email allowlist in Worker
+- [x] Private R2 object storage binding
+- [x] D1 media metadata index
+- [x] Authenticated photo/video streaming
+- [x] Upload from device up to 95 MB per file
+- [x] Responsive initial gallery
+- [ ] Configure production Cloudflare resources
+- [ ] Configure Access policy for exactly two emails
+- [ ] Production smoke test with disposable media
+- [ ] Multipart upload for large videos
 
 ### Phase 2 — Google Photos import
 - [ ] Google OAuth configuration
@@ -91,24 +100,21 @@ Recommended deployment target: Cloudflare Worker + private R2 bucket, with appli
 - [ ] Import progress + failure recovery
 
 ### Phase 3 — Gallery UX
-- [ ] Responsive masonry/grid gallery
 - [ ] Fullscreen photo viewer
-- [ ] Video playback
+- [ ] Improved video viewer
 - [ ] Favorites
 - [ ] Captions
 - [ ] Search/filter by type/date
+- [ ] Optional thumbnails/transcodes
 
 ### Phase 4 — Hardening
-- [ ] Content Security Policy
+- [x] Initial Content Security Policy
 - [ ] Rate limiting
 - [ ] Access audit events without sensitive media data
 - [ ] Backup/restore strategy
+- [ ] EXIF/location metadata policy
 - [ ] Security review
-
-## Current implementation
-
-The `feat/pwa-foundation` branch contains the first mobile-first PWA shell. Import controls intentionally remain disabled until an authenticated private backend is connected. The service worker caches only the application shell and explicitly excludes `/api/*` and `/media/*` from offline caching.
 
 ## Repository policy
 
-This repository contains **code and documentation only**. Do not add personal photos/videos, exports from Google Photos, `.env` files, OAuth credentials, service-account files, private keys or production database dumps.
+This repository contains **code and documentation only**. Do not add personal photos/videos, exports from Google Photos, `.env` files, `.dev.vars`, OAuth credentials, service-account files, private keys or production database dumps.
