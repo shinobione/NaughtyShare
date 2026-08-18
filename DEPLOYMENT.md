@@ -19,7 +19,32 @@ The first deployment uses **bootstrap mode**. It intentionally installs invalid 
 
 ## 1. Create private Cloudflare storage
 
-Authenticate Wrangler locally if you are doing the resource setup from a terminal:
+### Windows helper — recommended
+
+From a fresh local checkout of the repository, open PowerShell in the repo root and run:
+
+```powershell
+npx wrangler login
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap-cloudflare.ps1
+```
+
+The helper:
+
+1. installs project dependencies;
+2. verifies the Wrangler login;
+3. creates `naughtyshare-media` only if the private R2 bucket does not already exist;
+4. creates `naughtyshare` only if the D1 database does not already exist;
+5. reads the real D1 UUID and replaces only the all-zero placeholder in `wrangler.jsonc`;
+6. applies the remote D1 migrations;
+7. runs the normal build/dry-run and production preflight.
+
+It does **not** create or request application secrets, upload media, enable public R2 access or deploy the Worker.
+
+After it passes, the expected local Git change is the real D1 `database_id` in `wrangler.jsonc`. Commit that identifier to the repository before running the GitHub production deployment.
+
+### Manual equivalent
+
+Authenticate Wrangler locally:
 
 ```bash
 npm install
