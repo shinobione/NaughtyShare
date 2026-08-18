@@ -52,6 +52,46 @@ function Invoke-Wrangler {
   }
 }
 
+function Get-NaughtyShareD1 {
+  $list = Invoke-Wrangler -Arguments @('d1', 'list', '--json') -Capture
+  if ($list.ExitCode -ne 0) {
+    Write-Host $list.Output
+    throw 'Unable to list D1 databases in the authenticated Cloudflare account.'
+  }
+
+  $jsonStart = $list.Output.IndexOf('[')
+  if ($jsonStart -lt 0) {
+    throw 'Wrangler d1 list did not return a JSON array.'
+  }
+
+  $jsonText = $list.Output.Substring($jsonStart)
+  try {
+    $databases = @($jsonText | ConvertFrom-Json)
+  } catch {
+    throw "Unable to parse Wrangler D1 list JSON: $($_.Exception.Message)"
+  }
+
+  $database = $databases |
+    Where-Object {
+      $_.name -eq 'naughtyshare' -or
+      $_.database_name -eq 'naughtyshare'
+    } |
+    Select-Object -First 1
+
+  if (-not $database) {
+    return $null
+  }
+
+  foreach ($property in @('uuid', 'database_id', 'id')) {
+    $value = $database.$property
+    if ($value -and $value -match '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') {
+      return $value.ToLowerInvariant()
+    }
+  }
+
+  throw 'Found D1 database naughtyshare, but its UUID was missing from Wrangler JSON output.'
+}
+
 if ($NativeCaptureSelfTest) {
   $probe = Invoke-NativeCapture -FilePath 'cmd.exe' -Arguments @('/d', '/c', 'echo naughtyshare-native-stderr-probe 1>&2 & exit /b 7')
   if ($probe.ExitCode -ne 7 -or $probe.Output -notmatch 'naughtyshare-native-stderr-probe') {
@@ -89,30 +129,22 @@ Write-Host '[3/7] Ensuring private R2 bucket naughtyshare-media exists...'
 $r2Info = Invoke-Wrangler -Arguments @('r2', 'bucket', 'info', 'naughtyshare-media') -Capture
 if ($r2Info.ExitCode -ne 0) {
   Write-Host 'R2 bucket not found; creating it.'
-  Invoke-Wrangler -Arguments @('r2', 'bucket', 'create', 'naughtyshare-media')
+  Invoke-Wrangler -Arguments @('r2', 'bucket', 'create', 'naughtyshare-media', '--update-config=false')
 } else {
   Write-Host 'R2 bucket already exists.' -ForegroundColor Green
 }
 
 Write-Host '[4/7] Ensuring D1 database naughtyshare exists...'
-$d1Info = Invoke-Wrangler -Arguments @('d1', 'info', 'naughtyshare', '--json') -Capture
-if ($d1Info.ExitCode -ne 0) {
+$d1Id = Get-NaughtyShareD1
+if (-not $d1Id) {
   Write-Host 'D1 database not found; creating it.'
   Invoke-Wrangler -Arguments @('d1', 'create', 'naughtyshare', '--update-config=false')
-  $d1Info = Invoke-Wrangler -Arguments @('d1', 'info', 'naughtyshare', '--json') -Capture
+  $d1Id = Get-NaughtyShareD1
 }
 
-if ($d1Info.ExitCode -ne 0) {
-  Write-Host $d1Info.Output
-  throw 'Unable to read the NaughtyShare D1 database after creation.'
+if (-not $d1Id) {
+  throw 'Unable to find the NaughtyShare D1 database after creation.'
 }
-
-$uuidPattern = '(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b'
-$uuidMatch = [regex]::Match($d1Info.Output, $uuidPattern)
-if (-not $uuidMatch.Success) {
-  throw 'Could not extract a D1 database UUID from `wrangler d1 info --json`.'
-}
-$d1Id = $uuidMatch.Value.ToLowerInvariant()
 Write-Host "D1 database ID: $d1Id" -ForegroundColor Green
 
 Write-Host '[5/7] Wiring the D1 database ID into wrangler.jsonc...'
