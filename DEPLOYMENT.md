@@ -2,14 +2,26 @@
 
 This document intentionally contains **no production identifiers, emails, tokens or private media**.
 
-## 1. Install and authenticate Wrangler
+## Safety defaults
+
+Production exposure is denied by default in `wrangler.jsonc`:
+
+- `workers_dev: false`
+- `preview_urls: false`
+- required Worker secrets are declared explicitly
+- the production preflight refuses to deploy while the D1 ID is still a placeholder
+- the production preflight refuses to deploy until a real custom-domain route is configured
+
+The GitHub production workflow is **manual only** and requires typing `DEPLOY`.
+
+## 1. Create private Cloudflare storage
+
+Authenticate Wrangler locally:
 
 ```bash
 npm install
 npx wrangler login
 ```
-
-## 2. Create private storage
 
 Create the R2 bucket used by the `MEDIA` binding:
 
@@ -33,83 +45,109 @@ Apply the schema:
 npx wrangler d1 migrations apply naughtyshare --remote
 ```
 
+## 2. Choose the private app hostname
+
+Use a custom hostname on a Cloudflare-managed domain, for example `share.your-domain.example`.
+
+Add it to `wrangler.jsonc` as a custom-domain route before any production deployment:
+
+```jsonc
+"routes": [
+  {
+    "pattern": "share.your-domain.example",
+    "custom_domain": true
+  }
+]
+```
+
+Keep `workers_dev` and `preview_urls` set to `false`.
+
 ## 3. Configure Cloudflare Access
 
-Deploy NaughtyShare on an Access-protected hostname, preferably a custom hostname on a Cloudflare-managed domain.
+Create a Cloudflare Access self-hosted application for the exact hostname chosen above.
 
-Create a Cloudflare Access application for that hostname and an **Allow** policy whose identity rule contains exactly the two approved email addresses. Do not use `Everyone`, a whole email domain, or a login-method-only rule.
+Create an **Allow** policy whose identity rule contains exactly the two approved email addresses. Do not use `Everyone`, a whole email domain, or a login-method-only rule.
 
-Email one-time PIN is sufficient for the initial two-person setup if desired. The Access policy is the first authorization boundary; the Worker performs a second one.
+Email one-time PIN is sufficient for the initial two-person setup if desired. Access is the first authorization boundary; the Worker performs a second exact-email check.
 
 From the Access application settings, collect:
 
 - the team domain, for example `your-team.cloudflareaccess.com`;
 - the Application Audience (AUD) tag.
 
-## 4. Prepare first-deploy secrets locally
+The Worker validates the `Cf-Access-Jwt-Assertion` signature, issuer and audience before trusting the email claim.
 
-Copy the committed placeholder file:
+## 4. Configure GitHub production secrets
 
-```bash
-cp .env.example .env.production
-```
-
-Fill `.env.production` locally with the real values:
+Create a GitHub Environment named `production` and store these secrets in it:
 
 ```text
-ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
-ACCESS_AUD=your-access-application-aud
-ALLOWED_EMAILS=first@example.com,second@example.com
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN
+ACCESS_TEAM_DOMAIN
+ACCESS_AUD
+ALLOWED_EMAILS
 ```
 
-`.env.production` is ignored by Git. Never commit it or paste its contents into an issue, PR, log or screenshot.
+`ALLOWED_EMAILS` is a comma-separated list containing exactly the two approved addresses.
 
-The Worker rejects a request unless the Cloudflare Access JWT signature, issuer and audience are valid **and** its verified email exists in `ALLOWED_EMAILS`.
+Scope the Cloudflare API token as narrowly as practical to the target account/resources. Never commit or paste these values into issues, PRs, logs or screenshots.
+
+If desired, add a required reviewer to the GitHub `production` environment for an additional manual deployment gate.
 
 ## 5. Validate before deployment
 
 ```bash
 npm run check
+npm run preflight:production
 ```
 
-This builds the PWA and asks Wrangler to bundle/validate the Worker using `deploy --dry-run`; it does not publish anything.
+`npm run check` builds the PWA and asks Wrangler to bundle/validate the Worker without publishing it.
 
-## 6. First production deploy
+`npm run preflight:production` additionally refuses production deployment when:
 
-Upload the initial secrets together with the code:
+- `workers.dev` or preview URLs are not explicitly disabled;
+- the D1 database ID is still the placeholder;
+- no real custom-domain route is configured;
+- required Worker secret names are missing from Wrangler config;
+- the private R2 binding is no longer the expected bucket.
 
-```bash
-npm run build
-npx wrangler deploy --secrets-file .env.production
+## 6. Manual GitHub deployment
+
+Open **Actions → Deploy Production → Run workflow** and enter:
+
+```text
+DEPLOY
 ```
 
-Wrangler preserves existing secrets on later normal deploys, so subsequent code-only releases can use:
+The workflow:
 
-```bash
-npm run deploy
-```
+1. installs dependencies;
+2. runs the production preflight;
+3. builds the PWA;
+4. creates a temporary permission-restricted `.env.production` from GitHub secrets;
+5. runs `wrangler deploy --strict --secrets-file .env.production` so code and Worker secrets are uploaded together;
+6. removes the temporary secrets file even when the job fails.
 
-If a secret later needs changing, use `npx wrangler secret put <NAME>` after the Worker exists.
-
-Ensure the final application hostname is the hostname protected by the Access application from step 3.
+No production deployment runs automatically on a push or PR.
 
 ## 7. Production smoke test
 
 Use disposable/non-sensitive test media first.
 
-1. Open the PWA while logged out: Cloudflare Access must challenge you before the app loads.
+1. Open the final hostname while logged out: Cloudflare Access must challenge you before the app loads.
 2. Authenticate with approved account A: `/api/health` should make the UI show `Coffre connecté`.
 3. Upload one disposable image smaller than 95 MB.
 4. Confirm it appears in the gallery and loads from `/media/<id>`.
 5. Upload one short disposable video and verify playback plus seeking.
 6. Authenticate with approved account B and confirm the same gallery is visible.
 7. Attempt access from an unapproved email and confirm Access denies it.
-8. Confirm the R2 bucket still has no public endpoint enabled.
-9. Delete the disposable objects manually before using real private media if desired.
+8. Confirm `workers.dev`, Worker preview URLs and public R2 access are all disabled.
+9. Delete the disposable test media before using sensitive content if desired.
 
 ## Current upload limit
 
-Phase 1 uses direct authenticated uploads through the Worker and intentionally caps each file at **95 MB**. This stays below Cloudflare's 100 MB request-body limit on Free/Pro accounts. A later slice will add multipart upload for larger videos.
+Phase 1 uses direct authenticated uploads through the Worker and caps each file at **95 MB**. Larger videos will use multipart upload in a later slice.
 
 ## Logging rule
 
