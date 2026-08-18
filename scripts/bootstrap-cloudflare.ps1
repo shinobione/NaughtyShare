@@ -66,7 +66,7 @@ Write-Host '[4/7] Ensuring D1 database naughtyshare exists...'
 $d1Info = Invoke-Wrangler -Arguments @('d1', 'info', 'naughtyshare', '--json') -Capture
 if ($d1Info.ExitCode -ne 0) {
   Write-Host 'D1 database not found; creating it.'
-  Invoke-Wrangler -Arguments @('d1', 'create', 'naughtyshare')
+  Invoke-Wrangler -Arguments @('d1', 'create', 'naughtyshare', '--update-config=false')
   $d1Info = Invoke-Wrangler -Arguments @('d1', 'info', 'naughtyshare', '--json') -Capture
 }
 
@@ -94,7 +94,8 @@ $currentId = $currentMatch.Groups[1].Value
 $placeholder = '00000000-0000-0000-0000-000000000000'
 if ($currentId -eq $placeholder) {
   $config = $config.Substring(0, $currentMatch.Groups[1].Index) + $d1Id + $config.Substring($currentMatch.Groups[1].Index + $currentMatch.Groups[1].Length)
-  Set-Content -LiteralPath $configPath -Value $config -Encoding utf8NoBOM
+  $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+  [System.IO.File]::WriteAllText($configPath, $config, $utf8NoBom)
   Write-Host 'wrangler.jsonc updated.' -ForegroundColor Green
 } elseif ($currentId -eq $d1Id) {
   Write-Host 'wrangler.jsonc already points to this D1 database.' -ForegroundColor Green
