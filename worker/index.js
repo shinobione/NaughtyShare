@@ -2,6 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
 const MEDIA_TYPES = ['image/', 'video/'];
+const BLOCKED_MEDIA_TYPES = new Set(['image/svg+xml']);
 const jwksByIssuer = new Map();
 
 class HttpError extends Error {
@@ -131,8 +132,11 @@ async function uploadMedia(request, env, user) {
   if (!request.body) throw new HttpError(400, 'Empty upload');
 
   const contentType = (request.headers.get('content-type') || '').split(';', 1)[0].trim().toLowerCase();
-  if (!MEDIA_TYPES.some((prefix) => contentType.startsWith(prefix))) {
-    throw new HttpError(415, 'Only image and video uploads are accepted');
+  if (
+    !MEDIA_TYPES.some((prefix) => contentType.startsWith(prefix)) ||
+    BLOCKED_MEDIA_TYPES.has(contentType)
+  ) {
+    throw new HttpError(415, 'Unsupported image or video type');
   }
 
   const declaredLength = Number(request.headers.get('content-length') || 0);
@@ -149,10 +153,6 @@ async function uploadMedia(request, env, user) {
     httpMetadata: {
       contentType,
       cacheControl: 'private, no-store',
-    },
-    customMetadata: {
-      originalName,
-      uploadedBy: user.email,
     },
   });
 
@@ -226,6 +226,7 @@ async function serveMedia(request, env, id) {
   headers.set('x-content-type-options', 'nosniff');
   headers.set('referrer-policy', 'no-referrer');
   headers.set('content-disposition', 'inline');
+  headers.set('content-security-policy', "default-src 'none'; sandbox");
 
   let status = 200;
   if (rangeHeader && object.range) {

@@ -46,23 +46,25 @@ From the Access application settings, collect:
 - the team domain, for example `your-team.cloudflareaccess.com`;
 - the Application Audience (AUD) tag.
 
-## 4. Store private runtime configuration as Worker secrets
+## 4. Prepare first-deploy secrets locally
 
-Never commit the values below to Git.
+Copy the committed placeholder file:
 
 ```bash
-npx wrangler secret put ACCESS_TEAM_DOMAIN
-npx wrangler secret put ACCESS_AUD
-npx wrangler secret put ALLOWED_EMAILS
+cp .env.example .env.production
 ```
 
-For `ALLOWED_EMAILS`, enter the two exact approved addresses separated by a comma:
+Fill `.env.production` locally with the real values:
 
 ```text
-first@example.com,second@example.com
+ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
+ACCESS_AUD=your-access-application-aud
+ALLOWED_EMAILS=first@example.com,second@example.com
 ```
 
-The Worker rejects a request unless the Cloudflare Access JWT signature, issuer and audience are valid **and** its verified email exists in this list.
+`.env.production` is ignored by Git. Never commit it or paste its contents into an issue, PR, log or screenshot.
+
+The Worker rejects a request unless the Cloudflare Access JWT signature, issuer and audience are valid **and** its verified email exists in `ALLOWED_EMAILS`.
 
 ## 5. Validate before deployment
 
@@ -72,11 +74,22 @@ npm run check
 
 This builds the PWA and asks Wrangler to bundle/validate the Worker using `deploy --dry-run`; it does not publish anything.
 
-## 6. Deploy
+## 6. First production deploy
+
+Upload the initial secrets together with the code:
+
+```bash
+npm run build
+npx wrangler deploy --secrets-file .env.production
+```
+
+Wrangler preserves existing secrets on later normal deploys, so subsequent code-only releases can use:
 
 ```bash
 npm run deploy
 ```
+
+If a secret later needs changing, use `npx wrangler secret put <NAME>` after the Worker exists.
 
 Ensure the final application hostname is the hostname protected by the Access application from step 3.
 
@@ -100,4 +113,4 @@ Phase 1 uses direct authenticated uploads through the Worker and intentionally c
 
 ## Logging rule
 
-Do not add request bodies, filenames, JWTs, email addresses or media URLs to application logs. The Worker currently emits no application `console.log` output.
+Do not add request bodies, filenames, JWTs, email addresses or media URLs to application logs. The Worker currently emits no application `console.log` output and stores filenames/user identity only in D1, not in R2 custom metadata.
