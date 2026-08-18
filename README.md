@@ -74,7 +74,7 @@ Recommended deployment target: Cloudflare Worker + private R2 bucket, with appli
 - [x] Initialize repository
 - [x] Define privacy boundary
 - [x] Document Google Photos Locked Folder limitation
-- [ ] PWA shell + manifest + offline app shell
+- [x] PWA shell + manifest + offline app shell
 - [ ] Private API skeleton
 
 ### Phase 1 — Secure vault
@@ -104,6 +104,10 @@ Recommended deployment target: Cloudflare Worker + private R2 bucket, with appli
 - [ ] Access audit events without sensitive media data
 - [ ] Backup/restore strategy
 - [ ] Security review
+
+## Current implementation
+
+The `feat/pwa-foundation` branch contains the first mobile-first PWA shell. Import controls intentionally remain disabled until an authenticated private backend is connected. The service worker caches only the application shell and explicitly excludes `/api/*` and `/media/*` from offline caching.
 
 ## Repository policy
 
