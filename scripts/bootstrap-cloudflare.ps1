@@ -1,11 +1,39 @@
 [CmdletBinding()]
-param()
+param(
+  [switch] $NativeCaptureSelfTest
+)
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
+
+function Invoke-NativeCapture {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string] $FilePath,
+    [Parameter(Mandatory = $true)]
+    [string[]] $Arguments
+  )
+
+  # Windows PowerShell 5.1 turns redirected native stderr into ErrorRecord objects.
+  # With the script-wide ErrorActionPreference=Stop that would terminate here before
+  # we can inspect LASTEXITCODE. Temporarily downgrade only this capture operation.
+  $previousPreference = $ErrorActionPreference
+  try {
+    $ErrorActionPreference = 'Continue'
+    $output = & $FilePath @Arguments 2>&1
+    $exitCode = $LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $previousPreference
+  }
+
+  return [pscustomobject]@{
+    ExitCode = $exitCode
+    Output = ($output -join "`n")
+  }
+}
 
 function Invoke-Wrangler {
   param(
@@ -15,18 +43,22 @@ function Invoke-Wrangler {
   )
 
   if ($Capture) {
-    $output = & npx.cmd wrangler @Arguments 2>&1
-    $exitCode = $LASTEXITCODE
-    return [pscustomobject]@{
-      ExitCode = $exitCode
-      Output = ($output -join "`n")
-    }
+    return Invoke-NativeCapture -FilePath 'npx.cmd' -Arguments (@('wrangler') + $Arguments)
   }
 
   & npx.cmd wrangler @Arguments
   if ($LASTEXITCODE -ne 0) {
     throw "Wrangler command failed: npx wrangler $($Arguments -join ' ')"
   }
+}
+
+if ($NativeCaptureSelfTest) {
+  $probe = Invoke-NativeCapture -FilePath 'cmd.exe' -Arguments @('/d', '/c', 'echo naughtyshare-native-stderr-probe 1>&2 & exit /b 7')
+  if ($probe.ExitCode -ne 7 -or $probe.Output -notmatch 'naughtyshare-native-stderr-probe') {
+    throw "Native stderr capture self-test failed. ExitCode=$($probe.ExitCode) Output=$($probe.Output)"
+  }
+  Write-Host 'Native stderr capture self-test PASS.' -ForegroundColor Green
+  exit 0
 }
 
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
@@ -71,6 +103,7 @@ if ($d1Info.ExitCode -ne 0) {
 }
 
 if ($d1Info.ExitCode -ne 0) {
+  Write-Host $d1Info.Output
   throw 'Unable to read the NaughtyShare D1 database after creation.'
 }
 
