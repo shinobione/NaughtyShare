@@ -7,8 +7,8 @@ function requireMatch(pattern, message) {
   if (!pattern.test(config)) failures.push(message);
 }
 
-requireMatch(/"workers_dev"\s*:\s*false/, 'workers_dev must be explicitly false');
 requireMatch(/"preview_urls"\s*:\s*false/, 'preview_urls must be explicitly false');
+requireMatch(/"run_worker_first"\s*:\s*true/, 'assets.run_worker_first must be true so authentication gates the PWA shell');
 
 for (const secret of ['ACCESS_TEAM_DOMAIN', 'ACCESS_AUD', 'ALLOWED_EMAILS']) {
   if (!config.includes(`"${secret}"`)) failures.push(`required secret ${secret} is not declared`);
@@ -19,10 +19,12 @@ if (!databaseId || databaseId === '00000000-0000-0000-0000-000000000000') {
   failures.push('replace the D1 database_id placeholder with the real production database ID');
 }
 
+const workersDevEnabled = /"workers_dev"\s*:\s*true/.test(config);
 const customDomain = config.match(/"pattern"\s*:\s*"([^"]+)"[\s\S]*?"custom_domain"\s*:\s*true/)?.[1];
-if (!customDomain) {
-  failures.push('configure a production custom-domain route in wrangler.jsonc before deployment');
-} else if (/example\.(com|org|net)|localhost/i.test(customDomain)) {
+if (!workersDevEnabled && !customDomain) {
+  failures.push('enable workers.dev or configure a real custom-domain route');
+}
+if (customDomain && /example\.(com|org|net)|localhost/i.test(customDomain)) {
   failures.push(`custom-domain route still looks like a placeholder: ${customDomain}`);
 }
 
@@ -37,5 +39,5 @@ if (failures.length) {
 }
 
 console.log('NaughtyShare production preflight PASS');
-console.log(`Custom domain: ${customDomain}`);
+console.log(`Exposure mode: ${customDomain ? `custom domain ${customDomain}` : 'workers.dev protected by Cloudflare Access'}`);
 console.log(`D1 database ID configured: ${databaseId}`);

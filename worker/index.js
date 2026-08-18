@@ -264,8 +264,6 @@ export default {
     const url = new URL(request.url);
     const isPrivateRoute = url.pathname.startsWith('/api/') || url.pathname.startsWith('/media/');
 
-    if (!isPrivateRoute) return env.ASSETS.fetch(request);
-
     try {
       const user = await authenticate(request, env);
 
@@ -287,7 +285,8 @@ export default {
         return await serveMedia(request, env, id);
       }
 
-      return json({ error: 'Not found' }, 404);
+      if (isPrivateRoute) return json({ error: 'Not found' }, 404);
+      return env.ASSETS.fetch(request);
     } catch (error) {
       return errorResponse(error);
     }

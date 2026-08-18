@@ -2,21 +2,24 @@
 
 This document intentionally contains **no production identifiers, emails, tokens or private media**.
 
-## Safety defaults
+## Deployment model
 
-Production exposure is denied by default in `wrangler.jsonc`:
+NaughtyShare can start on its Cloudflare `workers.dev` hostname; a custom domain is optional later.
 
-- `workers_dev: false`
-- `preview_urls: false`
-- required Worker secrets are declared explicitly
-- the production preflight refuses to deploy while the D1 ID is still a placeholder
-- the production preflight refuses to deploy until a real custom-domain route is configured
+Security remains deny-by-default:
 
-The GitHub production workflow is **manual only** and requires typing `DEPLOY`.
+- `preview_urls: false` disables Worker preview URLs;
+- `workers_dev: true` provides the initial stable application hostname;
+- `assets.run_worker_first: true` sends the PWA shell and static assets through Worker authentication too;
+- required Worker secrets are declared explicitly;
+- the production preflight refuses to deploy while the D1 ID is still a placeholder;
+- the GitHub production workflow is manual only and requires typing `DEPLOY`.
+
+The first deployment uses **bootstrap mode**. It intentionally installs invalid Access credentials, so the deployed Worker exists but returns an authentication error to everyone. After Cloudflare Access is enabled on that Worker, a second **production mode** deployment installs the real Access settings and exact two-email allowlist.
 
 ## 1. Create private Cloudflare storage
 
-Authenticate Wrangler locally:
+Authenticate Wrangler locally if you are doing the resource setup from a terminal:
 
 ```bash
 npm install
@@ -29,7 +32,7 @@ Create the R2 bucket used by the `MEDIA` binding:
 npx wrangler r2 bucket create naughtyshare-media
 ```
 
-Do **not** enable `r2.dev` public access and do not attach a public R2 custom domain.
+Do **not** enable public `r2.dev` access for this bucket and do not attach a public R2 custom domain.
 
 Create the D1 database:
 
@@ -45,41 +48,80 @@ Apply the schema:
 npx wrangler d1 migrations apply naughtyshare --remote
 ```
 
-## 2. Choose the private app hostname
+The D1 database ID is an identifier, not an application secret; it belongs in `wrangler.jsonc`.
 
-Use a custom hostname on a Cloudflare-managed domain, for example `share.your-domain.example`.
+## 2. Configure the GitHub deployment environment
 
-Add it to `wrangler.jsonc` as a custom-domain route before any production deployment:
+Create a GitHub Environment named `production`.
 
-```jsonc
-"routes": [
-  {
-    "pattern": "share.your-domain.example",
-    "custom_domain": true
-  }
-]
+For the bootstrap deployment it needs:
+
+```text
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN
 ```
 
-Keep `workers_dev` and `preview_urls` set to `false`.
+Store both as GitHub encrypted environment secrets. Scope the Cloudflare API token as narrowly as practical to the account/resources NaughtyShare needs. Never commit or paste the token into an issue, PR, log or screenshot.
 
-## 3. Configure Cloudflare Access
+The real Access values are added later in step 5.
 
-Create a Cloudflare Access self-hosted application for the exact hostname chosen above.
+## 3. Validate and perform the locked bootstrap deploy
 
-Create an **Allow** policy whose identity rule contains exactly the two approved email addresses. Do not use `Everyone`, a whole email domain, or a login-method-only rule.
+Before deployment:
 
-Email one-time PIN is sufficient for the initial two-person setup if desired. Access is the first authorization boundary; the Worker performs a second exact-email check.
+```bash
+npm run check
+npm run preflight:production
+```
 
-From the Access application settings, collect:
+The production preflight verifies that:
 
-- the team domain, for example `your-team.cloudflareaccess.com`;
+- Worker preview URLs are disabled;
+- static assets are routed through Worker authentication;
+- required Worker secret names are declared;
+- the D1 database ID is no longer the placeholder;
+- either `workers.dev` is enabled or a real custom-domain route exists;
+- the private R2 binding still points at `naughtyshare-media`.
+
+Then open **Actions → Deploy Production → Run workflow** and choose:
+
+```text
+mode: bootstrap
+confirm: DEPLOY
+```
+
+Bootstrap mode deploys the application with deliberately invalid authentication values. The Worker is therefore present at its `workers.dev` hostname but must not serve the PWA, API or media to an unauthenticated visitor.
+
+Record the resulting `https://<worker>.<account-subdomain>.workers.dev` hostname.
+
+## 4. Enable Cloudflare Access on the Worker
+
+In Cloudflare, enable Access protection for the Worker's `workers.dev` route and configure an **Allow** policy containing exactly the two approved email addresses.
+
+Do not use an `Everyone` rule or a broad whole-domain allow rule for this two-person vault.
+
+Email one-time PIN is suitable for the initial two-person setup if desired. Access becomes the first authorization boundary; the Worker remains the second boundary.
+
+From the resulting Access application/settings, collect:
+
+- the Access team domain, for example `your-team.cloudflareaccess.com`;
 - the Application Audience (AUD) tag.
 
-The Worker validates the `Cf-Access-Jwt-Assertion` signature, issuer and audience before trusting the email claim.
+The Worker validates the `Cf-Access-Jwt-Assertion` signature, issuer and audience before accepting its email claim.
 
-## 4. Configure GitHub production secrets
+## 5. Add the real Access secrets
 
-Create a GitHub Environment named `production` and store these secrets in it:
+Add these GitHub `production` environment secrets:
+
+```text
+ACCESS_TEAM_DOMAIN
+ACCESS_AUD
+ALLOWED_EMAILS
+```
+
+`ALLOWED_EMAILS` is a comma-separated list containing exactly the same two approved addresses as the Cloudflare Access policy.
+
+At this point the GitHub production environment contains five secrets total:
 
 ```text
 CLOUDFLARE_ACCOUNT_ID
@@ -89,35 +131,13 @@ ACCESS_AUD
 ALLOWED_EMAILS
 ```
 
-`ALLOWED_EMAILS` is a comma-separated list containing exactly the two approved addresses.
+## 6. Deploy the real authenticated configuration
 
-Scope the Cloudflare API token as narrowly as practical to the target account/resources. Never commit or paste these values into issues, PRs, logs or screenshots.
-
-If desired, add a required reviewer to the GitHub `production` environment for an additional manual deployment gate.
-
-## 5. Validate before deployment
-
-```bash
-npm run check
-npm run preflight:production
-```
-
-`npm run check` builds the PWA and asks Wrangler to bundle/validate the Worker without publishing it.
-
-`npm run preflight:production` additionally refuses production deployment when:
-
-- `workers.dev` or preview URLs are not explicitly disabled;
-- the D1 database ID is still the placeholder;
-- no real custom-domain route is configured;
-- required Worker secret names are missing from Wrangler config;
-- the private R2 binding is no longer the expected bucket.
-
-## 6. Manual GitHub deployment
-
-Open **Actions → Deploy Production → Run workflow** and enter:
+Open **Actions → Deploy Production → Run workflow** again and choose:
 
 ```text
-DEPLOY
+mode: production
+confirm: DEPLOY
 ```
 
 The workflow:
@@ -125,25 +145,31 @@ The workflow:
 1. installs dependencies;
 2. runs the production preflight;
 3. builds the PWA;
-4. creates a temporary permission-restricted `.env.production` from GitHub secrets;
-5. runs `wrangler deploy --strict --secrets-file .env.production` so code and Worker secrets are uploaded together;
+4. creates a temporary permission-restricted `.env.production` from GitHub encrypted secrets;
+5. runs `wrangler deploy --strict --secrets-file .env.production`, uploading code and Worker secrets together;
 6. removes the temporary secrets file even when the job fails.
 
-No production deployment runs automatically on a push or PR.
+No production deployment runs automatically on a push or pull request.
 
 ## 7. Production smoke test
 
 Use disposable/non-sensitive test media first.
 
-1. Open the final hostname while logged out: Cloudflare Access must challenge you before the app loads.
+1. Open the `workers.dev` hostname while logged out: Cloudflare Access must challenge you before the PWA is usable.
 2. Authenticate with approved account A: `/api/health` should make the UI show `Coffre connecté`.
 3. Upload one disposable image smaller than 95 MB.
 4. Confirm it appears in the gallery and loads from `/media/<id>`.
 5. Upload one short disposable video and verify playback plus seeking.
 6. Authenticate with approved account B and confirm the same gallery is visible.
-7. Attempt access from an unapproved email and confirm Access denies it.
-8. Confirm `workers.dev`, Worker preview URLs and public R2 access are all disabled.
+7. Attempt access with an unapproved email and confirm it is denied.
+8. Confirm Worker preview URLs and public R2 access remain disabled.
 9. Delete the disposable test media before using sensitive content if desired.
+
+Only after this smoke passes should real private media be imported.
+
+## Optional custom domain later
+
+A custom domain can replace the `workers.dev` address later without changing the media architecture. When doing that, keep Cloudflare Access enabled for the new hostname and keep `assets.run_worker_first: true`.
 
 ## Current upload limit
 

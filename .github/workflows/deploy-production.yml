@@ -3,8 +3,16 @@ name: Deploy Production
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'bootstrap = locked first deploy; production = real Access secrets'
+        required: true
+        default: bootstrap
+        type: choice
+        options:
+          - bootstrap
+          - production
       confirm:
-        description: 'Type DEPLOY to authorize a production release'
+        description: 'Type DEPLOY to authorize the release'
         required: true
         type: string
 
@@ -39,7 +47,19 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Prepare encrypted Worker secrets file
+      - name: Prepare bootstrap lock secrets
+        if: ${{ github.event.inputs.mode == 'bootstrap' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' \
+            'ACCESS_TEAM_DOMAIN=bootstrap.invalid' \
+            'ACCESS_AUD=bootstrap-locked' \
+            'ALLOWED_EMAILS=nobody@example.invalid' > .env.production
+
+      - name: Prepare real Access secrets
+        if: ${{ github.event.inputs.mode == 'production' }}
         shell: bash
         env:
           ACCESS_TEAM_DOMAIN: ${{ secrets.ACCESS_TEAM_DOMAIN }}
