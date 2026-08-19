@@ -1,0 +1,388 @@
+/* NaughtyShare v0.6 — Moments polish, covers and ordering */
+
+.moments-rail {
+  position: relative;
+}
+
+.moments-rail-nav {
+  position: absolute;
+  z-index: 8;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 52px;
+  margin-top: -26px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-radius: 14px;
+  color: #fff;
+  background: rgba(9,9,14,.78);
+  box-shadow: 0 12px 36px rgba(0,0,0,.34);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.moments-rail-prev { left: -10px; }
+.moments-rail-next { right: -10px; }
+
+.moments-card-description {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: calc(100% - 8px);
+  margin-top: 5px;
+  color: rgba(255,255,255,.76);
+  font-size: 11px;
+  line-height: 1.25;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.moments-order-controls {
+  position: absolute;
+  z-index: 5;
+  top: 54px;
+  right: 12px;
+  display: flex;
+  gap: 5px;
+}
+
+.moments-order-button {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(8,8,12,.52);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.moments-order-button:disabled {
+  opacity: .25;
+  cursor: default;
+}
+
+.moments-focus {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  min-height: 138px;
+  margin: 8px 0 12px;
+  padding: 22px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 24px;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(255,77,157,.18), rgba(182,108,255,.1));
+}
+
+.moments-focus[hidden] { display: none !important; }
+.moments-focus.tone-0 { background: linear-gradient(145deg, rgba(255,77,157,.24), rgba(182,108,255,.12)); }
+.moments-focus.tone-1 { background: linear-gradient(145deg, rgba(130,94,255,.24), rgba(255,77,157,.11)); }
+.moments-focus.tone-2 { background: linear-gradient(145deg, rgba(255,143,91,.21), rgba(255,77,157,.1)); }
+.moments-focus.tone-3 { background: linear-gradient(145deg, rgba(69,189,190,.18), rgba(182,108,255,.11)); }
+.moments-focus.tone-4 { background: linear-gradient(145deg, rgba(255,205,94,.16), rgba(255,77,157,.12)); }
+.moments-focus.tone-5 { background: linear-gradient(145deg, rgba(89,119,255,.2), rgba(48,48,64,.35)); }
+
+.moments-focus-cover,
+.moments-focus-shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.moments-focus-cover {
+  object-fit: cover;
+  opacity: .33;
+  filter: saturate(.92) contrast(1.05);
+}
+
+.moments-focus-shade {
+  background: linear-gradient(90deg, rgba(8,8,13,.87) 0%, rgba(8,8,13,.64) 58%, rgba(8,8,13,.5));
+}
+
+.moments-focus-content,
+.moments-focus-actions {
+  position: relative;
+  z-index: 2;
+}
+
+.moments-focus-content {
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.moments-focus-kind {
+  color: rgba(255,255,255,.66);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.moments-focus-name {
+  margin-top: 4px;
+  font-size: clamp(24px, 4vw, 36px);
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+
+.moments-focus-description {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 720px;
+  margin-top: 8px;
+  color: #ddd2db;
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.moments-focus-meta {
+  margin-top: 9px;
+  color: rgba(255,255,255,.63);
+  font-size: 11px;
+}
+
+.moments-focus-actions {
+  align-self: end;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.moments-focus-button,
+.moments-cover-button,
+.moments-cover-choice {
+  border: 1px solid rgba(255,255,255,.12);
+  color: #fff;
+  cursor: pointer;
+}
+
+.moments-focus-button {
+  min-height: 40px;
+  padding: 0 13px;
+  border-radius: 12px;
+  background: rgba(8,8,13,.48);
+  backdrop-filter: blur(12px);
+  font-weight: 800;
+}
+
+.moments-focus-button-soft { color: #cdbfcb; }
+
+.moments-cover-button {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 8px 11px 8px 8px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.04);
+  text-align: left;
+}
+
+.moments-cover-button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+.moments-cover-thumb {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 11px;
+  overflow: hidden;
+  color: #ff8dbf;
+  background: rgba(255,255,255,.055);
+  font-size: 20px;
+}
+
+.moments-cover-thumb-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.moments-cover-copy {
+  min-width: 0;
+}
+
+.moments-cover-copy strong,
+.moments-cover-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moments-cover-copy small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.moments-cover-chevron {
+  color: var(--muted);
+  font-size: 24px;
+}
+
+.moments-cover-dialog {
+  width: min(760px, calc(100vw - 24px));
+}
+
+.moments-cover-grid {
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  align-items: stretch;
+}
+
+.moments-cover-choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 128px;
+  padding: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255,255,255,.04);
+}
+
+.moments-cover-choice.is-selected {
+  border-color: rgba(255,136,189,.75);
+  box-shadow: 0 0 0 1px rgba(255,77,157,.25);
+}
+
+.moments-cover-choice-media {
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+  background: #09090d;
+}
+
+.moments-cover-choice-label {
+  display: block;
+  overflow: hidden;
+  padding: 8px 9px 9px;
+  color: #ddd2dc;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moments-cover-auto {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 78px;
+  padding: 12px;
+  text-align: left;
+}
+
+.moments-cover-auto-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  color: #ff8dbf;
+  background: rgba(255,77,157,.1);
+  font-size: 19px;
+}
+
+.moments-cover-auto strong,
+.moments-cover-auto small {
+  display: block;
+}
+
+.moments-cover-auto small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.moments-cover-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (hover: hover) {
+  .collection-card:hover .moments-order-controls { opacity: 1; }
+  .moments-order-controls { opacity: .62; transition: opacity .16s ease; }
+  .moments-focus-button:hover,
+  .moments-cover-button:hover,
+  .moments-cover-choice:hover,
+  .moments-order-button:hover:not(:disabled),
+  .moments-rail-nav:hover {
+    border-color: rgba(255,136,189,.42);
+    background-color: rgba(255,255,255,.075);
+  }
+}
+
+@media (max-width: 760px) {
+  .moments-rail-nav {
+    top: auto;
+    bottom: 16px;
+    width: 32px;
+    height: 40px;
+    margin: 0;
+    border-radius: 11px;
+    opacity: .82;
+  }
+  .moments-rail-prev { left: 3px; }
+  .moments-rail-next { right: 3px; }
+
+  .moments-order-controls {
+    top: 52px;
+    right: 9px;
+  }
+
+  .moments-focus {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    min-height: 180px;
+    padding: 18px;
+  }
+
+  .moments-focus-shade {
+    background: linear-gradient(180deg, rgba(8,8,13,.35), rgba(8,8,13,.88) 68%);
+  }
+
+  .moments-focus-actions {
+    justify-content: stretch;
+  }
+
+  .moments-focus-button {
+    flex: 1;
+  }
+
+  .moments-cover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .moments-cover-grid { grid-template-columns: 1fr 1fr; }
+  .moments-focus-button { min-width: calc(50% - 4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moments-order-controls { transition: none; }
+}
