@@ -1,13 +1,19 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "naughtyshare",
-  "main": "worker/index.js",
+  "main": "worker/entry.js",
   "compatibility_date": "2026-08-18",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
   "secrets": {
-    "required": ["ACCESS_TEAM_DOMAIN", "ACCESS_AUD", "ALLOWED_EMAILS"]
+    "required": [
+      "ACCESS_TEAM_DOMAIN",
+      "ACCESS_AUD",
+      "ALLOWED_EMAILS",
+      "GOOGLE_PHOTOS_CLIENT_ID",
+      "GOOGLE_PHOTOS_CLIENT_SECRET"
+    ]
   },
   "assets": {
     "directory": "./dist",
