@@ -6,9 +6,7 @@ Private two-person PWA for securely sharing personal photos and videos.
 
 ## Goal
 
-NaughtyShare is a private gallery shared by two explicitly authorized users. It is designed as an installable PWA with a mobile-first experience for photos and videos.
-
-The product direction is now centered on **manual device import + private organization inside NaughtyShare** rather than Google Photos Picker integration.
+NaughtyShare is a private gallery shared by two explicitly authorized users. It is designed as an installable, mobile-first PWA for photos and videos, with manual device upload as the canonical ingest path and private organization inside the app.
 
 ## Architecture
 
@@ -37,138 +35,147 @@ NaughtyShare Worker + static PWA
 - No analytics or third-party trackers are present.
 - Cloudflare Access JWTs are signature-validated by the Worker; an email header alone is never trusted.
 - Exact authorized emails are checked a second time in the Worker through `ALLOWED_EMAILS`.
+- Manual photo rotation is metadata-only and never rewrites the original image bytes.
+- Smart Moments use only trusted capture dates: EXIF, video-container metadata or a manually corrected capture date.
 
-## Current implementation
+## Current production state
 
-### v0.4.0 production
+### v0.8.0 — production smoke pass
 
-The production Secure Vault is active on Cloudflare. v0.4.0 is deployed and its main Phase 1.5 gallery-management flows have been smoke-tested successfully in production.
+NaughtyShare is active in production on Cloudflare and the main end-to-end flows have been smoke-tested successfully.
 
-Implemented and validated foundation:
+Validated foundation and media flows:
 
 - Cloudflare Worker backend.
-- Cloudflare Access JWT validation using `jose`.
-- Exact two-user allowlist support.
+- Cloudflare Access with Google authentication and exact two-user authorization.
+- Worker-side Access JWT signature/AUD/issuer validation through `jose`.
+- Second exact-email allowlist in the Worker.
 - Private R2 media storage binding (`naughtyshare-media`).
-- D1 media metadata index.
-- Authenticated gallery listing.
-- Authenticated image/video streaming with byte-range support.
-- Direct device upload for images and videos up to 95 MB per file.
-- Streamed uploads: media is not buffered into Worker memory.
-- R2 rollback when D1 metadata commit fails.
-- CSP, frame denial, referrer and browser-permission headers for static assets.
-- GitHub CI build + Wrangler dry-run validation.
-- Production Cloudflare resources and Access policy configured.
-- Production photo upload/read smoke test passed.
-- Production video upload/playback/seek smoke test passed.
-- Persistent FR/VN interface switch with Vietnamese browser-locale defaulting.
-- Persisted sorting by name, media type, duration and upload date.
-- Authenticated rename/delete actions.
-- Compensating D1/R2 delete flow.
-- Expanded photo/video lightbox with previous/next navigation.
-- NaughtyShare storage count/bytes summary from the D1 index.
+- D1 canonical media metadata index.
+- Authenticated image/video streaming with byte-range support and video seek.
+- Direct device upload up to 95 MB per file.
+- Multipart upload path above 95 MB, with a current app cap of 5 GB/file.
+- Upload progress and abort cleanup for large transfers.
+- R2 rollback when final D1 indexing fails.
+- Persistent FR/VN interface switch.
+- Sorting by name, type, duration, upload date and real capture date.
+- Real photo capture dates from EXIF and video dates from MP4/MOV container metadata.
+- Manual capture-date correction when embedded metadata is absent or wrong.
+- Non-destructive photo rotation by 90° steps.
+- Authenticated rename/delete with compensating D1/R2 behavior.
+- Expanded photo/video viewer with previous/next navigation and mobile photo swipe.
+- Capture-sorted viewer navigation constrained to the currently visible filtered set.
+- NaughtyShare media count and indexed storage total.
 
-### v0.5.0 candidate — Moments & Collections
+Validated organization and gallery flows:
 
-The next release candidate moves NaughtyShare from a flat gallery toward a small private media library for two people.
-
-Candidate features:
-
-- **Google Photos import removed from the active product**; manual device upload is canonical.
-- **Moments / Collections / Themes** as editable cards with name, type, date, description, icon and visual tone.
-- Free naming such as `NuNu`, `LuLu`, `KuKu`, `PuPu`, or any other private theme.
-- **Favorites** as an automatic collection.
-- Per-media **captions** and optional moment date.
+- Editable **Moments / Collections / Themes** with free names, date, description, icon and visual tone.
+- Automatic **Favorites** collection.
+- Per-media favorites, captions and optional moment date.
+- Add/remove media from multiple collections.
 - Search by media name or caption.
-- Add/remove a media item from multiple collections.
-- Collection cards with optional authenticated media cover.
-- Mobile horizontal collection strip with scroll snapping.
-- Mobile swipe navigation in the expanded photo viewer.
-- Multipart/resumable-style chunk upload path for media above the old 95 MB direct-upload limit, with a current NaughtyShare cap of 5 GB per file.
-- Upload progress for large media.
-- Organization metadata stored privately under an `app-data/` prefix in the existing R2 bucket; it is never exposed as gallery media.
-- Media deletion performs best-effort cleanup of favorites/captions/collection membership metadata.
-- Client bundle/cache hardening so new releases do not execute stale JS after deployment.
+- Explicit collection cover selection with authenticated media.
+- Persistent custom collection ordering.
+- Active-Moment presentation with cover, metadata and quick actions.
+- Bulk-select visible media and assign them to one or several cards.
+- Bulk-remove media from the currently active custom collection without deleting the underlying media.
+- Persistent gallery display modes: **Comfort / Masonry / Compact**.
+- **Smart Moments** generated from trusted capture dates only.
+- Same-day suggestions from 2+ media and short 2–3 day suggestions from 4+ media.
+- One-click Smart Moment creation with automatic membership assignment and rollback on failure.
+- Local dismissal of Smart Moment suggestions per device.
+
+## Release history
+
+- **v0.4.0** — gallery management, storage counter, rename/delete, expanded viewer.
+- **v0.5.0** — Moments/Collections/Themes, favorites, captions, search, large multipart upload.
+- **v0.5.1** — real capture dates, capture-date scan/backfill and non-destructive photo rotation.
+- **v0.6.0** — explicit covers, persistent card ordering and polished Moment presentation.
+- **v0.7.0** — bulk selection plus Comfort/Masonry/Compact gallery modes.
+- **v0.7.1** — capture-sorted viewer navigation stays inside the visible collection/search result.
+- **v0.8.0** — Smart Moments from trusted capture dates.
 
 ## Roadmap
 
-### Phase 0 — Foundation
+### Phase 0 — Foundation — DONE
 - [x] Initialize repository
 - [x] Define privacy boundary
 - [x] PWA shell + manifest
 - [x] Private API skeleton
 
-### Phase 1 — Secure vault
+### Phase 1 — Secure vault — PRODUCTION SMOKE PASS
 - [x] Cloudflare Access JWT verification in Worker
 - [x] Second exact-email allowlist in Worker
 - [x] Private R2 object storage binding
 - [x] D1 media metadata index
 - [x] Authenticated photo/video streaming
 - [x] Upload from device up to 95 MB per file
-- [x] Responsive initial gallery
-- [x] Configure production Cloudflare resources
-- [x] Configure Access policy for exactly two emails
-- [x] Production photo smoke test with disposable media
-- [x] Production video playback + seek smoke test
-- [x] Second-user production smoke test with Trân
+- [x] Production photo upload/read smoke
+- [x] Production video playback + seek smoke
+- [x] Second-user production smoke
+- [x] Google authentication through Cloudflare Access
 
-### Phase 1.5 — Gallery management & viewer **PRODUCTION SMOKE PASS**
-
-#### Sorting and metadata
-- [x] Sort by name / type / duration / date
+### Phase 1.5 — Gallery management & viewer — PRODUCTION SMOKE PASS
+- [x] Sort by name / type / duration / upload date
 - [x] Ascending / descending direction
 - [x] Persist selected sort locally per device
-- [ ] Persist/backfill video duration server-side
-
-#### Rename and delete
-- [x] Rename media item
-- [x] Keep immutable R2 object key stable on rename
-- [x] Delete media item with explicit confirmation
+- [x] Authenticated rename/delete
 - [x] Compensating D1/R2 deletion
-- [x] FR/VN success and failure states
-
-#### Expanded viewer
 - [x] Responsive photo/video modal
 - [x] Native video controls, seek and fullscreen
 - [x] Previous / next navigation
-- [x] Close by button, backdrop and `Esc`
 - [x] Viewer rename/delete actions
 - [x] FR/VN viewer strings
-- [ ] Optional card-to-viewer morph animation
-
-#### Storage awareness
 - [x] NaughtyShare storage counter
-- [x] Media count + total bytes / MB / GB
-- [ ] Configurable warning thresholds
+- [ ] Persist/backfill video duration server-side
+- [ ] Optional card-to-viewer morph animation
+- [ ] Configurable storage warning thresholds
 - [ ] Optional admin-only account-wide R2 usage view
 
-### Phase 2 — Moments, Collections & personal organization
-- [x] Remove Google Photos Picker from active UI and Worker path
-- [x] Editable **Moment / Collection / Theme** cards
-- [x] Editable collection name, type, date, description, icon and visual tone
-- [x] Automatic **Favorites** collection
-- [x] Per-media favorite toggle
-- [x] Per-media captions
+### Phase 2 — Moments, Collections & personal organization — PRODUCTION SMOKE PASS
+- [x] Manual device upload is canonical; Google Photos Picker retired from active product
+- [x] Editable Moment / Collection / Theme cards
+- [x] Editable name, type, date, description, icon and visual tone
+- [x] Automatic Favorites collection
+- [x] Per-media favorite toggle and captions
 - [x] Optional per-media moment date
 - [x] Add/remove media from multiple collections
 - [x] Search by media name or caption
 - [x] Mobile horizontal collection cards
-- [ ] Drag/reorder collections
-- [ ] Choose/replace collection cover explicitly
-- [ ] Bulk-select multiple media and assign them together
+- [x] Explicit collection cover selection
+- [x] Persistent collection ordering
+- [x] Bulk-select and assign multiple media together
 - [ ] Optional collection sharing/export summary without exposing media URLs
 
-### Phase 3 — Mobile gallery polish
+### Phase 2.5 — Capture intelligence — PRODUCTION SMOKE PASS
+- [x] EXIF photo capture-date extraction
+- [x] MP4/MOV container creation-date extraction
+- [x] Manual capture-date correction
+- [x] Existing-library capture-date scan/backfill
+- [x] Sort by capture date
+- [x] Non-destructive photo rotation
+- [x] Viewer order guard for capture sort + active filters
+
+### Phase 3 — Mobile gallery polish — PARTIAL
 - [x] Swipe navigation for photos in viewer
+- [x] Better mobile density/layout controls
+- [x] Masonry and Compact gallery modes
+- [x] Bulk selection with touch-friendly controls
 - [ ] Swipe navigation that coexists safely with video controls
-- [ ] Better mobile density/layout controls
-- [ ] Optional masonry / compact view
 - [ ] Faster thumbnail strategy for very large libraries
-- [ ] Smarter date grouping in the main gallery
+- [ ] Chronological grouping/navigation in the main gallery
 - [ ] Quick filters by type/date/favorite/collection
 
-### Phase 4 — Large media
-- [x] Multipart upload path above the 95 MB direct-upload threshold
+### Phase 3.5 — Smart organization — PRODUCTION SMOKE PASS
+- [x] Smart same-day grouping from trusted capture dates
+- [x] Smart short-period grouping across 2–3 consecutive days
+- [x] One-click real Moment creation
+- [x] Automatic membership assignment
+- [x] Roll back a newly created Smart Moment if assignment fails
+- [x] FR/VN Smart Moments UI
+
+### Phase 4 — Large media — PARTIAL
+- [x] Multipart upload above the 95 MB direct-upload threshold
 - [x] Large-upload progress
 - [x] Abort cleanup on failed client transfer
 - [x] Final D1 insert only after R2 multipart completion
@@ -178,7 +185,7 @@ Candidate features:
 - [ ] Large-video playback performance review
 - [ ] Optional configurable maximum above the current 5 GB app limit
 
-### Phase 5 — Hardening
+### Phase 5 — Hardening — PARTIAL
 - [x] Initial Content Security Policy
 - [x] Never cache private API/media responses
 - [x] Prevent stale executable PWA bundles after deploys
@@ -186,7 +193,19 @@ Candidate features:
 - [ ] Access audit events without sensitive media data
 - [ ] Backup/restore strategy
 - [ ] EXIF/location metadata policy
-- [ ] Security review after Moments/Collections and large uploads are production-tested
+- [ ] Security review after organization and large-upload flows are fully exercised in production
+
+## Next canonical slice — v0.9
+
+**Timeline & Quick Filters**
+
+Target:
+
+- chronological month/day navigation built on real capture dates;
+- quick filters for photo/video, favorites and known/unknown capture dates;
+- collection-aware filtering that combines with the existing Moment/search layer;
+- viewer navigation and visible counts must stay aligned with the final filtered set;
+- no media rewrite, no new secret and preferably no Worker migration.
 
 ## Google Photos decision
 
@@ -196,7 +215,7 @@ Manual workflow:
 
 1. Select media from the phone/device.
 2. Upload directly into the private NaughtyShare vault.
-3. Organize it inside NaughtyShare using Favorites, Moments, Collections and Themes.
+3. Organize it inside NaughtyShare using Favorites, Moments, Collections, Themes and Smart Moments.
 
 ## Repository policy
 
