@@ -1,4 +1,4 @@
-const CACHE = 'naughtyshare-shell-v1';
+const CACHE = 'naughtyshare-shell-v2';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icons/naughtyshare.svg'];
 
 self.addEventListener('install', (event) => {

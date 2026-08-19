@@ -52,11 +52,11 @@ Google Photos Picker will plug into the same authenticated import API during Pha
 - Cloudflare Access JWTs are signature-validated by the Worker; an email header alone is never trusted.
 - Exact authorized emails are checked a second time in the Worker through `ALLOWED_EMAILS`.
 
-## Current implementation — v0.3.0
+## Current implementation — v0.4.0 candidate
 
-NaughtyShare is now deployed as a production Worker backed by private R2 + D1 and protected by Cloudflare Access.
+The production Secure Vault is active on Cloudflare. v0.4.0 adds the Phase 1.5 gallery-management candidate; production remains on the previous deployed build until the manual production workflow is run after merge.
 
-Implemented and smoke-tested so far:
+Implemented and smoke-tested foundation:
 
 - Cloudflare Worker backend.
 - Cloudflare Access JWT validation using `jose`.
@@ -74,6 +74,15 @@ Implemented and smoke-tested so far:
 - Production photo upload/read smoke test passed.
 - Production video upload/playback/seek smoke test passed.
 - Persistent FR/VN interface switch with Vietnamese browser-locale defaulting.
+
+v0.4.0 candidate additionally includes:
+
+- persisted sorting by name, media type, duration and upload date;
+- authenticated rename/delete actions;
+- compensating D1/R2 delete flow;
+- expanded photo/video lightbox with previous/next navigation;
+- NaughtyShare storage count/bytes summary from the D1 index;
+- complete FR/VN strings for the new management UI.
 
 Remaining Phase 1 closeout: validate the second authorized user flow with Trân.
 
@@ -100,43 +109,43 @@ Remaining Phase 1 closeout: validate the second authorized user flow with Trân.
 - [x] Production video playback + seek smoke test
 - [ ] Second-user production smoke test with Trân
 
-### Phase 1.5 — Gallery management & viewer **NEXT**
+### Phase 1.5 — Gallery management & viewer **ACTIVE**
 
 #### Sorting and metadata
-- [ ] Sort gallery by **name**
-- [ ] Sort gallery by **type** (photo / video)
-- [ ] Sort gallery by **duration**
-- [ ] Sort gallery by **date**
-- [ ] Ascending / descending direction for every sort mode
-- [ ] Persist the selected sort locally per device
-- [ ] Store or derive video duration in metadata so duration sorting is deterministic
-- [ ] Backfill duration metadata for videos already present in the vault
+- [x] Sort gallery by **name**
+- [x] Sort gallery by **type** (photo / video)
+- [x] Sort gallery by **duration**
+- [x] Sort gallery by **date**
+- [x] Ascending / descending direction for every sort mode
+- [x] Persist the selected sort locally per device
+- [x] Derive video duration from authenticated media metadata for duration sorting
+- [ ] Persist/backfill video duration server-side so large galleries do not need metadata probing on each fresh device
 
 #### Rename and delete
-- [ ] Rename a media item from the gallery/viewer
-- [ ] Treat rename as a safe display-name metadata change in D1; keep the immutable R2 object key stable unless there is a strong reason to move the object
-- [ ] Delete a media item from the gallery/viewer
-- [ ] Add an explicit confirmation step before deletion
-- [ ] Delete/reconcile both the R2 object and D1 metadata without leaving orphaned records or orphaned objects
-- [ ] Surface clear FR/VN success and failure states for rename/delete
+- [x] Rename a media item from the gallery/viewer
+- [x] Treat rename as a safe display-name metadata change in D1; keep the immutable R2 object key stable
+- [x] Delete a media item from the gallery/viewer
+- [x] Add an explicit confirmation step before deletion
+- [x] Use compensating D1/R2 deletion so a failed R2 delete restores the D1 row and remains safely retryable
+- [x] Surface clear FR/VN success and failure states for rename/delete
 
 #### Classy expanded viewer / lightbox
-- [ ] Clicking a photo or video opens a polished **modal/lightbox viewer** above the gallery
-- [ ] Smooth visual expansion from card to viewer where supported; reduced-motion friendly fallback
-- [ ] Large responsive photo display with contain/fit behavior and no forced crop
-- [ ] Large responsive video player with native controls, seek and fullscreen support
-- [ ] Previous / next navigation without closing the viewer
-- [ ] Close by explicit button, backdrop click and `Esc` on desktop
-- [ ] Mobile-friendly swipe/navigation affordances where reliable
-- [ ] Keep private media URLs behind the authenticated Worker; viewer must not introduce public object URLs
-- [ ] Viewer actions: rename and delete available from the expanded item
-- [ ] All viewer UI translated FR/VN
+- [x] Clicking a photo or video opens a polished **modal/lightbox viewer** above the gallery
+- [ ] Optional card-to-viewer morph animation; current dialog honors the global reduced-motion fallback
+- [x] Large responsive photo display with contain/fit behavior and no forced crop
+- [x] Large responsive video player with native controls, seek and fullscreen support
+- [x] Previous / next navigation without closing the viewer
+- [x] Close by explicit button, backdrop click and `Esc` on desktop
+- [ ] Mobile swipe navigation
+- [x] Keep private media URLs behind the authenticated Worker; viewer introduces no public object URLs
+- [x] Viewer actions: rename and delete available from the expanded item
+- [x] All viewer UI translated FR/VN
 
 #### Storage awareness
-- [ ] Add a **NaughtyShare storage counter** based on indexed media sizes
-- [ ] Show total media count + total bytes / MB / GB used by NaughtyShare
-- [ ] Keep the counter scoped to the `naughtyshare-media` bucket/app dataset
-- [ ] Display a note that Cloudflare R2 free-tier usage is account-wide, so LaunchPAD and NaughtyShare can contribute to the same overall billing quota even though they use separate buckets
+- [x] Add a **NaughtyShare storage counter** based on indexed media sizes
+- [x] Show total media count + total bytes / MB / GB used by NaughtyShare
+- [x] Keep the counter scoped to the `naughtyshare-media` app dataset
+- [x] Display a note that Cloudflare R2 free-tier usage is account-wide, so LaunchPAD and NaughtyShare can contribute to the same overall billing quota even though they use separate buckets
 - [ ] Add configurable warning thresholds before heavy storage growth
 - [ ] Optional later admin-only account-wide R2 usage view if it can be implemented without exposing a Cloudflare management token to the browser
 

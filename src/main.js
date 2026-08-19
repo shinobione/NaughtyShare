@@ -1,9 +1,12 @@
 import './styles.css';
 
 const MAX_UPLOAD_BYTES = 95 * 1024 * 1024;
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.4.0';
 const LANGUAGE_STORAGE_KEY = 'naughtyshare-language';
+const SORT_FIELD_STORAGE_KEY = 'naughtyshare-sort-field';
+const SORT_DIRECTION_STORAGE_KEY = 'naughtyshare-sort-direction';
 const SUPPORTED_LANGUAGES = new Set(['fr', 'vi']);
+const SUPPORTED_SORTS = new Set(['date', 'name', 'type', 'duration']);
 const app = document.querySelector('#app');
 
 const translations = {
@@ -35,6 +38,40 @@ const translations = {
     footerVersion: `NaughtyShare v${APP_VERSION}`,
     footerPrivacy: 'Code ≠ médias · aucun contenu privé dans Git',
     mediaCount: (count) => `${count} média${count > 1 ? 's' : ''}`,
+    storageTitle: 'Stockage NaughtyShare',
+    storageUsed: (size) => `${size} utilisés`,
+    storageNote: 'Bucket privé NaughtyShare · le quota R2 gratuit est partagé au niveau du compte Cloudflare.',
+    sortLabel: 'Trier par',
+    sortDate: 'Date d’ajout',
+    sortName: 'Nom',
+    sortType: 'Type',
+    sortDuration: 'Durée',
+    ascending: 'Croissant',
+    descending: 'Décroissant',
+    sortDirectionAria: 'Inverser le sens du tri',
+    imageType: 'PHOTO',
+    videoType: 'VIDÉO',
+    openMedia: (name) => `Ouvrir ${name}`,
+    rename: 'Renommer',
+    delete: 'Supprimer',
+    close: 'Fermer',
+    previous: 'Précédent',
+    next: 'Suivant',
+    position: (index, total) => `${index} / ${total}`,
+    noDuration: '—',
+    durationLoading: '…',
+    renameTitle: 'Renommer ce média',
+    renameLabel: 'Nouveau nom',
+    renameCancel: 'Annuler',
+    renameSave: 'Enregistrer',
+    renameSuccess: 'Média renommé.',
+    renameFailure: 'Impossible de renommer ce média.',
+    deleteTitle: 'Supprimer ce média ?',
+    deleteBody: 'Cette action supprimera définitivement la copie NaughtyShare du stockage privé.',
+    deleteCancel: 'Annuler',
+    deleteConfirm: 'Supprimer définitivement',
+    deleteSuccess: 'Média supprimé du coffre.',
+    deleteFailure: 'Impossible de supprimer ce média.',
     unsupportedMedia: (name) => `${name} n’est pas une image ou une vidéo reconnue.`,
     tooLarge: (name) => `${name} dépasse 95 MB.`,
     sending: (index, total, name) => `Envoi ${index}/${total} · ${name}…`,
@@ -45,6 +82,7 @@ const translations = {
     bytes: (value) => `${value} o`,
     kilobytes: (value) => `${value} Ko`,
     megabytes: (value) => `${value} Mo`,
+    gigabytes: (value) => `${value} Go`,
   },
   vi: {
     locale: 'vi-VN',
@@ -74,6 +112,40 @@ const translations = {
     footerVersion: `NaughtyShare v${APP_VERSION}`,
     footerPrivacy: 'Mã nguồn ≠ ảnh/video · không có nội dung riêng tư trong Git',
     mediaCount: (count) => `${count} mục`,
+    storageTitle: 'Dung lượng NaughtyShare',
+    storageUsed: (size) => `Đã dùng ${size}`,
+    storageNote: 'Bucket NaughtyShare riêng tư · hạn mức R2 miễn phí được tính chung cho tài khoản Cloudflare.',
+    sortLabel: 'Sắp xếp theo',
+    sortDate: 'Ngày thêm',
+    sortName: 'Tên',
+    sortType: 'Loại',
+    sortDuration: 'Thời lượng',
+    ascending: 'Tăng dần',
+    descending: 'Giảm dần',
+    sortDirectionAria: 'Đảo chiều sắp xếp',
+    imageType: 'ẢNH',
+    videoType: 'VIDEO',
+    openMedia: (name) => `Mở ${name}`,
+    rename: 'Đổi tên',
+    delete: 'Xóa',
+    close: 'Đóng',
+    previous: 'Trước',
+    next: 'Sau',
+    position: (index, total) => `${index} / ${total}`,
+    noDuration: '—',
+    durationLoading: '…',
+    renameTitle: 'Đổi tên nội dung',
+    renameLabel: 'Tên mới',
+    renameCancel: 'Hủy',
+    renameSave: 'Lưu',
+    renameSuccess: 'Đã đổi tên.',
+    renameFailure: 'Không thể đổi tên nội dung này.',
+    deleteTitle: 'Xóa nội dung này?',
+    deleteBody: 'Thao tác này sẽ xóa vĩnh viễn bản sao NaughtyShare khỏi kho lưu trữ riêng tư.',
+    deleteCancel: 'Hủy',
+    deleteConfirm: 'Xóa vĩnh viễn',
+    deleteSuccess: 'Đã xóa khỏi kho.',
+    deleteFailure: 'Không thể xóa nội dung này.',
     unsupportedMedia: (name) => `${name} không phải là ảnh hoặc video được hỗ trợ.`,
     tooLarge: (name) => `${name} vượt quá 95 MB.`,
     sending: (index, total, name) => `Đang tải lên ${index}/${total} · ${name}…`,
@@ -84,6 +156,7 @@ const translations = {
     bytes: (value) => `${value} B`,
     kilobytes: (value) => `${value} KB`,
     megabytes: (value) => `${value} MB`,
+    gigabytes: (value) => `${value} GB`,
   },
 };
 
@@ -98,8 +171,33 @@ function readInitialLanguage() {
   return navigator.language?.toLowerCase().startsWith('vi') ? 'vi' : 'fr';
 }
 
+function readSortField() {
+  try {
+    const saved = localStorage.getItem(SORT_FIELD_STORAGE_KEY);
+    if (SUPPORTED_SORTS.has(saved)) return saved;
+  } catch {
+    // Keep the default sort for this session.
+  }
+  return 'date';
+}
+
+function readSortDirection() {
+  try {
+    return localStorage.getItem(SORT_DIRECTION_STORAGE_KEY) === 'asc' ? 'asc' : 'desc';
+  } catch {
+    return 'desc';
+  }
+}
+
 let currentLanguage = readInitialLanguage();
 let currentItems = [];
+let currentStats = { count: 0, sizeBytes: 0 };
+let sortField = readSortField();
+let sortDirection = readSortDirection();
+let activeMediaId = null;
+let pendingRenameId = null;
+let pendingDeleteId = null;
+let durationRerenderTimer = null;
 
 function t(key, ...args) {
   const value = translations[currentLanguage][key];
@@ -174,6 +272,28 @@ app.innerHTML = `
         <span class="count" id="media-count"></span>
       </div>
 
+      <div class="gallery-toolbar" id="gallery-toolbar">
+        <div class="storage-summary">
+          <span class="storage-icon">◫</span>
+          <span>
+            <strong id="storage-title"></strong>
+            <small id="storage-used"></small>
+          </span>
+          <span class="storage-note" id="storage-note"></span>
+        </div>
+
+        <div class="sort-controls">
+          <label for="sort-field" id="sort-label"></label>
+          <select id="sort-field">
+            <option value="date"></option>
+            <option value="name"></option>
+            <option value="type"></option>
+            <option value="duration"></option>
+          </select>
+          <button class="sort-direction" id="sort-direction" type="button"></button>
+        </div>
+      </div>
+
       <div class="empty-state" id="gallery-empty">
         <div class="empty-orbit"><span>♡</span></div>
         <h3 id="empty-title"></h3>
@@ -187,6 +307,53 @@ app.innerHTML = `
       <span id="footer-privacy"></span>
     </footer>
   </main>
+
+  <dialog class="media-dialog" id="media-dialog">
+    <div class="viewer-shell">
+      <header class="viewer-header">
+        <div class="viewer-heading">
+          <span class="viewer-type" id="viewer-type"></span>
+          <h3 id="viewer-name"></h3>
+        </div>
+        <div class="viewer-actions">
+          <button class="viewer-action" id="viewer-rename" type="button"><span>✎</span><b></b></button>
+          <button class="viewer-action danger" id="viewer-delete" type="button"><span>⌫</span><b></b></button>
+          <button class="viewer-close" id="viewer-close" type="button" aria-label="Close">×</button>
+        </div>
+      </header>
+      <div class="viewer-stage" id="viewer-stage"></div>
+      <button class="viewer-nav viewer-prev" id="viewer-prev" type="button">‹</button>
+      <button class="viewer-nav viewer-next" id="viewer-next" type="button">›</button>
+      <div class="viewer-footer">
+        <span id="viewer-details"></span>
+        <span id="viewer-position"></span>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="mini-dialog" id="rename-dialog">
+    <form class="mini-dialog-card" id="rename-form">
+      <h3 id="rename-title"></h3>
+      <label for="rename-input" id="rename-label"></label>
+      <input id="rename-input" type="text" maxlength="240" autocomplete="off" />
+      <div class="mini-dialog-actions">
+        <button class="secondary-button" id="rename-cancel" type="button"></button>
+        <button class="primary-button" id="rename-save" type="submit"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="mini-dialog" id="delete-dialog">
+    <div class="mini-dialog-card">
+      <h3 id="delete-title"></h3>
+      <p id="delete-body"></p>
+      <strong class="delete-name" id="delete-name"></strong>
+      <div class="mini-dialog-actions">
+        <button class="secondary-button" id="delete-cancel" type="button"></button>
+        <button class="danger-button" id="delete-confirm" type="button"></button>
+      </div>
+    </div>
+  </dialog>
 `;
 
 const brandLink = document.querySelector('#brand-link');
@@ -216,14 +383,76 @@ const emptyState = document.querySelector('#gallery-empty');
 const emptyTitle = document.querySelector('#empty-title');
 const emptyBody = document.querySelector('#empty-body');
 const mediaCount = document.querySelector('#media-count');
+const storageTitle = document.querySelector('#storage-title');
+const storageUsed = document.querySelector('#storage-used');
+const storageNote = document.querySelector('#storage-note');
+const sortLabel = document.querySelector('#sort-label');
+const sortFieldSelect = document.querySelector('#sort-field');
+const sortDirectionButton = document.querySelector('#sort-direction');
 const footerVersion = document.querySelector('#footer-version');
 const footerPrivacy = document.querySelector('#footer-privacy');
+const mediaDialog = document.querySelector('#media-dialog');
+const viewerType = document.querySelector('#viewer-type');
+const viewerName = document.querySelector('#viewer-name');
+const viewerStage = document.querySelector('#viewer-stage');
+const viewerDetails = document.querySelector('#viewer-details');
+const viewerPosition = document.querySelector('#viewer-position');
+const viewerPrev = document.querySelector('#viewer-prev');
+const viewerNext = document.querySelector('#viewer-next');
+const viewerRename = document.querySelector('#viewer-rename');
+const viewerDelete = document.querySelector('#viewer-delete');
+const viewerClose = document.querySelector('#viewer-close');
+const renameDialog = document.querySelector('#rename-dialog');
+const renameForm = document.querySelector('#rename-form');
+const renameTitle = document.querySelector('#rename-title');
+const renameLabel = document.querySelector('#rename-label');
+const renameInput = document.querySelector('#rename-input');
+const renameCancel = document.querySelector('#rename-cancel');
+const renameSave = document.querySelector('#rename-save');
+const deleteDialog = document.querySelector('#delete-dialog');
+const deleteTitle = document.querySelector('#delete-title');
+const deleteBody = document.querySelector('#delete-body');
+const deleteName = document.querySelector('#delete-name');
+const deleteCancel = document.querySelector('#delete-cancel');
+const deleteConfirm = document.querySelector('#delete-confirm');
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return '—';
   if (bytes < 1024) return t('bytes', bytes);
   if (bytes < 1024 ** 2) return t('kilobytes', (bytes / 1024).toFixed(1));
-  return t('megabytes', (bytes / 1024 ** 2).toFixed(1));
+  if (bytes < 1024 ** 3) return t('megabytes', (bytes / 1024 ** 2).toFixed(1));
+  return t('gigabytes', (bytes / 1024 ** 3).toFixed(2));
+}
+
+function formatDuration(seconds, isVideo = true) {
+  if (!isVideo) return t('noDuration');
+  if (!Number.isFinite(seconds) || seconds < 0) return t('durationLoading');
+  const total = Math.round(seconds);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
+}
+
+function isVideo(item) {
+  return item.contentType.startsWith('video/');
+}
+
+function typeLabel(item) {
+  return isVideo(item) ? t('videoType') : t('imageType');
+}
+
+function mediaDetails(item) {
+  const date = new Date(item.createdAt);
+  const when = Number.isNaN(date.getTime()) ? '' : date.toLocaleString(t('locale'));
+  const duration = isVideo(item) ? formatDuration(item.durationSeconds, true) : '';
+  return [formatBytes(item.sizeBytes), duration, when].filter(Boolean).join(' · ');
+}
+
+function showNotice(message, state = 'ok') {
+  uploadNote.dataset.state = state;
+  uploadNote.textContent = message;
 }
 
 function updateStatusText() {
@@ -233,50 +462,270 @@ function updateStatusText() {
   else statusText.textContent = t('statusChecking');
 }
 
-function renderGallery(items) {
-  currentItems = items;
-  gallery.replaceChildren();
-  mediaCount.textContent = t('mediaCount', items.length);
-  emptyState.hidden = items.length > 0;
-  gallery.hidden = items.length === 0;
+function persistSort() {
+  try {
+    localStorage.setItem(SORT_FIELD_STORAGE_KEY, sortField);
+    localStorage.setItem(SORT_DIRECTION_STORAGE_KEY, sortDirection);
+  } catch {
+    // Sorting still works for this session.
+  }
+}
 
-  for (const item of items) {
-    const card = document.createElement('article');
-    card.className = 'media-card';
+function sortedItems() {
+  const items = [...currentItems];
+  const direction = sortDirection === 'asc' ? 1 : -1;
+  const collator = new Intl.Collator(t('locale'), { numeric: true, sensitivity: 'base' });
 
-    const preview = item.contentType.startsWith('video/')
-      ? document.createElement('video')
-      : document.createElement('img');
+  items.sort((a, b) => {
+    let comparison = 0;
 
-    preview.className = 'media-preview';
-    preview.src = item.url;
-    preview.setAttribute('aria-label', item.originalName);
-
-    if (preview instanceof HTMLVideoElement) {
-      preview.controls = true;
-      preview.preload = 'metadata';
-      preview.playsInline = true;
+    if (sortField === 'name') {
+      comparison = collator.compare(a.originalName, b.originalName);
+    } else if (sortField === 'type') {
+      comparison = collator.compare(typeLabel(a), typeLabel(b));
+      if (comparison === 0) comparison = collator.compare(a.originalName, b.originalName);
+    } else if (sortField === 'duration') {
+      const aUnknown = isVideo(a) && !Number.isFinite(a.durationSeconds);
+      const bUnknown = isVideo(b) && !Number.isFinite(b.durationSeconds);
+      if (aUnknown && !bUnknown) return 1;
+      if (!aUnknown && bUnknown) return -1;
+      const aDuration = isVideo(a) ? (a.durationSeconds ?? 0) : 0;
+      const bDuration = isVideo(b) ? (b.durationSeconds ?? 0) : 0;
+      comparison = aDuration - bDuration;
+      if (comparison === 0) comparison = collator.compare(a.originalName, b.originalName);
     } else {
-      preview.alt = item.originalName;
-      preview.loading = 'lazy';
-      preview.decoding = 'async';
+      comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     }
 
-    const meta = document.createElement('div');
-    meta.className = 'media-meta';
+    return comparison * direction;
+  });
 
-    const name = document.createElement('strong');
-    name.textContent = item.originalName;
+  return items;
+}
 
-    const details = document.createElement('small');
-    const date = new Date(item.createdAt);
-    const when = Number.isNaN(date.getTime()) ? '' : date.toLocaleString(t('locale'));
-    details.textContent = [formatBytes(item.sizeBytes), when].filter(Boolean).join(' · ');
+function renderStorage() {
+  storageTitle.textContent = t('storageTitle');
+  storageUsed.textContent = t('storageUsed', formatBytes(currentStats.sizeBytes));
+  storageNote.textContent = t('storageNote');
+}
 
-    meta.append(name, details);
-    card.append(preview, meta);
-    gallery.append(card);
+function renderSortControls() {
+  sortLabel.textContent = t('sortLabel');
+  sortFieldSelect.options[0].textContent = t('sortDate');
+  sortFieldSelect.options[1].textContent = t('sortName');
+  sortFieldSelect.options[2].textContent = t('sortType');
+  sortFieldSelect.options[3].textContent = t('sortDuration');
+  sortFieldSelect.value = sortField;
+  sortDirectionButton.textContent = sortDirection === 'asc' ? `↑ ${t('ascending')}` : `↓ ${t('descending')}`;
+  sortDirectionButton.setAttribute('aria-label', t('sortDirectionAria'));
+}
+
+function scheduleDurationRerender() {
+  if (durationRerenderTimer || sortField !== 'duration') return;
+  durationRerenderTimer = window.setTimeout(() => {
+    durationRerenderTimer = null;
+    renderGallery();
+    if (activeMediaId) renderViewer();
+  }, 80);
+}
+
+function makeCard(item) {
+  const card = document.createElement('article');
+  card.className = 'media-card';
+  card.dataset.mediaId = item.id;
+
+  const openButton = document.createElement('button');
+  openButton.className = 'media-open';
+  openButton.type = 'button';
+  openButton.setAttribute('aria-label', t('openMedia', item.originalName));
+
+  const preview = isVideo(item) ? document.createElement('video') : document.createElement('img');
+  preview.className = 'media-preview';
+  preview.src = item.url;
+
+  if (preview instanceof HTMLVideoElement) {
+    preview.preload = 'metadata';
+    preview.muted = true;
+    preview.playsInline = true;
+    preview.addEventListener('loadedmetadata', () => {
+      const duration = preview.duration;
+      if (Number.isFinite(duration) && Math.abs((item.durationSeconds ?? -1) - duration) > 0.2) {
+        item.durationSeconds = duration;
+        const details = card.querySelector('.media-details');
+        if (details) details.textContent = mediaDetails(item);
+        scheduleDurationRerender();
+      }
+    }, { once: true });
+  } else {
+    preview.alt = item.originalName;
+    preview.loading = 'lazy';
+    preview.decoding = 'async';
   }
+
+  const badge = document.createElement('span');
+  badge.className = 'media-type-badge';
+  badge.textContent = typeLabel(item);
+
+  openButton.append(preview, badge);
+  if (isVideo(item)) {
+    const play = document.createElement('span');
+    play.className = 'play-badge';
+    play.textContent = '▶';
+    openButton.append(play);
+  }
+
+  const meta = document.createElement('div');
+  meta.className = 'media-meta';
+
+  const name = document.createElement('strong');
+  name.className = 'media-name';
+  name.textContent = item.originalName;
+
+  const details = document.createElement('small');
+  details.className = 'media-details';
+  details.textContent = mediaDetails(item);
+
+  const actions = document.createElement('div');
+  actions.className = 'media-card-actions';
+
+  const rename = document.createElement('button');
+  rename.type = 'button';
+  rename.className = 'icon-action';
+  rename.textContent = '✎';
+  rename.title = t('rename');
+  rename.setAttribute('aria-label', `${t('rename')} · ${item.originalName}`);
+  rename.addEventListener('click', () => openRenameDialog(item.id));
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'icon-action danger';
+  remove.textContent = '⌫';
+  remove.title = t('delete');
+  remove.setAttribute('aria-label', `${t('delete')} · ${item.originalName}`);
+  remove.addEventListener('click', () => openDeleteDialog(item.id));
+
+  actions.append(rename, remove);
+  meta.append(name, details, actions);
+  openButton.addEventListener('click', () => openViewer(item.id));
+  card.append(openButton, meta);
+  return card;
+}
+
+function renderGallery() {
+  const items = sortedItems();
+  gallery.replaceChildren();
+  mediaCount.textContent = t('mediaCount', currentStats.count || currentItems.length);
+  emptyState.hidden = currentItems.length > 0;
+  gallery.hidden = currentItems.length === 0;
+
+  for (const item of items) gallery.append(makeCard(item));
+}
+
+function renderViewer() {
+  if (!activeMediaId || !mediaDialog.open) return;
+  const items = sortedItems();
+  const index = items.findIndex((item) => item.id === activeMediaId);
+  if (index < 0) {
+    mediaDialog.close();
+    return;
+  }
+
+  const item = items[index];
+  viewerType.textContent = typeLabel(item);
+  viewerName.textContent = item.originalName;
+  viewerDetails.textContent = mediaDetails(item);
+  viewerPosition.textContent = t('position', index + 1, items.length);
+  viewerPrev.disabled = items.length <= 1;
+  viewerNext.disabled = items.length <= 1;
+  viewerPrev.setAttribute('aria-label', t('previous'));
+  viewerNext.setAttribute('aria-label', t('next'));
+  viewerClose.setAttribute('aria-label', t('close'));
+  viewerRename.querySelector('b').textContent = t('rename');
+  viewerDelete.querySelector('b').textContent = t('delete');
+
+  viewerStage.replaceChildren();
+  const media = isVideo(item) ? document.createElement('video') : document.createElement('img');
+  media.className = 'viewer-media';
+  media.src = item.url;
+
+  if (media instanceof HTMLVideoElement) {
+    media.controls = true;
+    media.preload = 'metadata';
+    media.playsInline = true;
+    media.addEventListener('loadedmetadata', () => {
+      if (Number.isFinite(media.duration)) {
+        item.durationSeconds = media.duration;
+        viewerDetails.textContent = mediaDetails(item);
+        scheduleDurationRerender();
+      }
+    });
+  } else {
+    media.alt = item.originalName;
+    media.decoding = 'async';
+  }
+
+  viewerStage.append(media);
+}
+
+function openViewer(id) {
+  activeMediaId = id;
+  if (!mediaDialog.open) mediaDialog.showModal();
+  document.body.classList.add('viewer-open');
+  renderViewer();
+}
+
+function moveViewer(delta) {
+  const items = sortedItems();
+  if (items.length <= 1) return;
+  const index = items.findIndex((item) => item.id === activeMediaId);
+  if (index < 0) return;
+  const nextIndex = (index + delta + items.length) % items.length;
+  activeMediaId = items[nextIndex].id;
+  renderViewer();
+}
+
+function openRenameDialog(id) {
+  const item = currentItems.find((entry) => entry.id === id);
+  if (!item) return;
+  pendingRenameId = id;
+  renameInput.value = item.originalName;
+  if (!renameDialog.open) renameDialog.showModal();
+  window.setTimeout(() => {
+    renameInput.focus();
+    renameInput.select();
+  }, 0);
+}
+
+function openDeleteDialog(id) {
+  const item = currentItems.find((entry) => entry.id === id);
+  if (!item) return;
+  pendingDeleteId = id;
+  deleteName.textContent = item.originalName;
+  if (!deleteDialog.open) deleteDialog.showModal();
+}
+
+async function renameMedia(id, name) {
+  const response = await fetch(`/api/media/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: {
+      'content-type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ name }),
+  });
+
+  if (!response.ok) throw new Error(t('renameFailure'));
+  const data = await response.json();
+  const item = currentItems.find((entry) => entry.id === id);
+  if (item && data?.item?.originalName) item.originalName = data.item.originalName;
+}
+
+async function deleteMedia(id) {
+  const response = await fetch(`/api/media/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error(t('deleteFailure'));
 }
 
 function applyLanguage(language, { persist = true } = {}) {
@@ -312,6 +761,14 @@ function applyLanguage(language, { persist = true } = {}) {
   emptyBody.textContent = t('emptyBody');
   footerVersion.textContent = t('footerVersion');
   footerPrivacy.textContent = t('footerPrivacy');
+  renameTitle.textContent = t('renameTitle');
+  renameLabel.textContent = t('renameLabel');
+  renameCancel.textContent = t('renameCancel');
+  renameSave.textContent = t('renameSave');
+  deleteTitle.textContent = t('deleteTitle');
+  deleteBody.textContent = t('deleteBody');
+  deleteCancel.textContent = t('deleteCancel');
+  deleteConfirm.textContent = t('deleteConfirm');
 
   for (const option of languageOptions) {
     const isActive = option.dataset.language === language;
@@ -324,7 +781,10 @@ function applyLanguage(language, { persist = true } = {}) {
   }
 
   updateStatusText();
-  renderGallery(currentItems);
+  renderStorage();
+  renderSortControls();
+  renderGallery();
+  renderViewer();
 }
 
 async function loadGallery() {
@@ -335,7 +795,18 @@ async function loadGallery() {
 
   if (!response.ok) throw new Error(t('galleryLoadError'));
   const data = await response.json();
-  renderGallery(Array.isArray(data.items) ? data.items : []);
+  const previousDurations = new Map(currentItems.map((item) => [item.id, item.durationSeconds]));
+  currentItems = Array.isArray(data.items)
+    ? data.items.map((item) => ({ ...item, durationSeconds: previousDurations.get(item.id) }))
+    : [];
+
+  currentStats = {
+    count: Number(data?.stats?.count ?? currentItems.length),
+    sizeBytes: Number(data?.stats?.sizeBytes ?? currentItems.reduce((sum, item) => sum + Number(item.sizeBytes || 0), 0)),
+  };
+
+  renderStorage();
+  renderGallery();
 }
 
 async function uploadFile(file, index, total) {
@@ -346,8 +817,7 @@ async function uploadFile(file, index, total) {
     throw new Error(t('tooLarge', file.name));
   }
 
-  uploadNote.dataset.state = 'working';
-  uploadNote.textContent = t('sending', index, total, file.name);
+  showNotice(t('sending', index, total, file.name), 'working');
 
   const response = await fetch('/api/media', {
     method: 'POST',
@@ -375,12 +845,10 @@ async function uploadFiles(files) {
     for (let i = 0; i < selected.length; i += 1) {
       await uploadFile(selected[i], i + 1, selected.length);
     }
-    uploadNote.dataset.state = 'ok';
-    uploadNote.textContent = t('uploadSuccess', selected.length);
+    showNotice(t('uploadSuccess', selected.length), 'ok');
     await loadGallery();
   } catch (error) {
-    uploadNote.dataset.state = 'error';
-    uploadNote.textContent = error instanceof Error ? error.message : t('uploadFailure');
+    showNotice(error instanceof Error ? error.message : t('uploadFailure'), 'error');
   } finally {
     deviceUpload.disabled = false;
     fileInput.value = '';
@@ -395,7 +863,6 @@ async function checkVault() {
     });
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
     const data = await response.json();
     if (data?.ok !== true) throw new Error('Vault unavailable');
 
@@ -414,8 +881,89 @@ for (const option of languageOptions) {
   option.addEventListener('click', () => applyLanguage(option.dataset.language));
 }
 
+sortFieldSelect.addEventListener('change', () => {
+  if (!SUPPORTED_SORTS.has(sortFieldSelect.value)) return;
+  sortField = sortFieldSelect.value;
+  persistSort();
+  renderSortControls();
+  renderGallery();
+  renderViewer();
+});
+
+sortDirectionButton.addEventListener('click', () => {
+  sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+  persistSort();
+  renderSortControls();
+  renderGallery();
+  renderViewer();
+});
+
 deviceUpload.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => uploadFiles(fileInput.files));
+viewerPrev.addEventListener('click', () => moveViewer(-1));
+viewerNext.addEventListener('click', () => moveViewer(1));
+viewerClose.addEventListener('click', () => mediaDialog.close());
+viewerRename.addEventListener('click', () => activeMediaId && openRenameDialog(activeMediaId));
+viewerDelete.addEventListener('click', () => activeMediaId && openDeleteDialog(activeMediaId));
+
+mediaDialog.addEventListener('click', (event) => {
+  if (event.target === mediaDialog) mediaDialog.close();
+});
+
+mediaDialog.addEventListener('close', () => {
+  viewerStage.replaceChildren();
+  activeMediaId = null;
+  document.body.classList.remove('viewer-open');
+});
+
+window.addEventListener('keydown', (event) => {
+  if (!mediaDialog.open || renameDialog.open || deleteDialog.open) return;
+  if (event.key === 'ArrowLeft') moveViewer(-1);
+  if (event.key === 'ArrowRight') moveViewer(1);
+});
+
+renameCancel.addEventListener('click', () => renameDialog.close());
+renameDialog.addEventListener('close', () => { pendingRenameId = null; });
+renameForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!pendingRenameId) return;
+  const id = pendingRenameId;
+  const name = renameInput.value.trim();
+  if (!name) return;
+  renameSave.disabled = true;
+
+  try {
+    await renameMedia(id, name);
+    renameDialog.close();
+    showNotice(t('renameSuccess'), 'ok');
+    renderGallery();
+    renderViewer();
+  } catch {
+    showNotice(t('renameFailure'), 'error');
+  } finally {
+    renameSave.disabled = false;
+  }
+});
+
+deleteCancel.addEventListener('click', () => deleteDialog.close());
+deleteDialog.addEventListener('close', () => { pendingDeleteId = null; });
+deleteConfirm.addEventListener('click', async () => {
+  if (!pendingDeleteId) return;
+  const id = pendingDeleteId;
+  deleteConfirm.disabled = true;
+
+  try {
+    await deleteMedia(id);
+    deleteDialog.close();
+    if (activeMediaId === id && mediaDialog.open) mediaDialog.close();
+    showNotice(t('deleteSuccess'), 'ok');
+    await loadGallery();
+  } catch {
+    showNotice(t('deleteFailure'), 'error');
+  } finally {
+    deleteConfirm.disabled = false;
+  }
+});
 
 applyLanguage(currentLanguage, { persist: false });
 checkVault();
