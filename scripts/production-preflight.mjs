@@ -9,16 +9,21 @@ function requireMatch(pattern, message) {
 
 requireMatch(/"preview_urls"\s*:\s*false/, 'preview_urls must be explicitly false');
 requireMatch(/"run_worker_first"\s*:\s*true/, 'assets.run_worker_first must be true so authentication gates the PWA shell');
-requireMatch(/"main"\s*:\s*"worker\/entry\.js"/, 'worker entry must route through worker/entry.js so Google Photos routes stay behind Access');
+requireMatch(/"main"\s*:\s*"worker\/app\.js"/, 'worker entry must route through worker/app.js so library APIs stay behind Access');
 
 for (const secret of [
   'ACCESS_TEAM_DOMAIN',
   'ACCESS_AUD',
   'ALLOWED_EMAILS',
+]) {
+  if (!config.includes(`"${secret}"`)) failures.push(`required secret ${secret} is not declared`);
+}
+
+for (const retiredSecret of [
   'GOOGLE_PHOTOS_CLIENT_ID',
   'GOOGLE_PHOTOS_CLIENT_SECRET',
 ]) {
-  if (!config.includes(`"${secret}"`)) failures.push(`required secret ${secret} is not declared`);
+  if (config.includes(`"${retiredSecret}"`)) failures.push(`retired Google Photos secret ${retiredSecret} should not be required`);
 }
 
 const databaseId = config.match(/"database_id"\s*:\s*"([^"]+)"/)?.[1];
