@@ -1,4 +1,4 @@
-const CACHE = 'naughtyshare-shell-v3';
+const CACHE = 'naughtyshare-shell-v4';
 const APP_SHELL = ['/manifest.webmanifest', '/icons/naughtyshare.svg'];
 
 self.addEventListener('install', (event) => {
@@ -25,8 +25,8 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/media/')) return;
 
   // NaughtyShare is an authenticated online vault. Never serve cached HTML or
-  // JavaScript because that can keep an installed PWA on an old Picker client
-  // after a production deploy. A stale UI is worse than an offline shell here.
+  // JavaScript because that can keep an installed PWA on an old UI after a deploy.
+  // A stale interface is worse than an offline shell here.
   if (
     request.mode === 'navigate' ||
     url.pathname === '/' ||
