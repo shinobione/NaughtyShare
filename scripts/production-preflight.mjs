@@ -9,7 +9,7 @@ function requireMatch(pattern, message) {
 
 requireMatch(/"preview_urls"\s*:\s*false/, 'preview_urls must be explicitly false');
 requireMatch(/"run_worker_first"\s*:\s*true/, 'assets.run_worker_first must be true so authentication gates the PWA shell');
-requireMatch(/"main"\s*:\s*"worker\/app\.js"/, 'worker entry must route through worker/app.js so library APIs stay behind Access');
+requireMatch(/"main"\s*:\s*"worker\/capture\.js"/, 'worker entry must route through worker/capture.js so capture/library APIs stay behind Access');
 
 for (const secret of [
   'ACCESS_TEAM_DOMAIN',
