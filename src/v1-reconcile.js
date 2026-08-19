@@ -25,6 +25,21 @@ function message() {
     : 'Le gros envoi précédent était déjà finalisé dans le coffre.';
 }
 
+function idleMessage() {
+  return document.documentElement.lang?.toLowerCase().startsWith('vi')
+    ? 'Tệp >95 MB dùng nhiều phần song song và có thể tiếp tục sau khi tải lại trang.'
+    : 'Les fichiers >95 Mo utilisent des blocs parallèles et peuvent reprendre après un rechargement.';
+}
+
+function syncPanel() {
+  const status = document.querySelector('#v1-upload-status');
+  const resume = document.querySelector('#v1-resume');
+  const abandon = document.querySelector('#v1-abandon');
+  if (status) status.textContent = idleMessage();
+  if (resume) resume.hidden = true;
+  if (abandon) abandon.hidden = true;
+}
+
 async function reconcile() {
   if (checking) return;
   const pending = readPending();
@@ -41,6 +56,7 @@ async function reconcile() {
     if (!committed) return;
 
     clearPending();
+    syncPanel();
     const note = document.querySelector('#upload-note');
     if (note) {
       note.dataset.state = 'ok';
