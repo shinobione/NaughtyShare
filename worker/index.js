@@ -126,6 +126,24 @@ async function getMediaRow(env, id) {
     .first();
 }
 
+async function insertMediaRow(env, row) {
+  await env.DB.prepare(
+    `INSERT INTO media (
+      id, object_key, original_name, content_type, size_bytes, uploaded_by, created_at
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
+  )
+    .bind(
+      row.id,
+      row.object_key,
+      row.original_name,
+      row.content_type,
+      row.size_bytes,
+      row.uploaded_by,
+      row.created_at,
+    )
+    .run();
+}
+
 async function health(env, user) {
   await Promise.all([
     env.DB.prepare('SELECT COUNT(*) AS count FROM media').first(),
@@ -209,21 +227,7 @@ async function uploadMedia(request, env, user) {
   };
 
   try {
-    await env.DB.prepare(
-      `INSERT INTO media (
-        id, object_key, original_name, content_type, size_bytes, uploaded_by, created_at
-      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
-    )
-      .bind(
-        row.id,
-        row.object_key,
-        row.original_name,
-        row.content_type,
-        row.size_bytes,
-        row.uploaded_by,
-        row.created_at,
-      )
-      .run();
+    await insertMediaRow(env, row);
   } catch (error) {
     await env.MEDIA.delete(key);
     throw error;
@@ -255,13 +259,23 @@ async function deleteMedia(env, id) {
   const row = await getMediaRow(env, id);
   if (!row) throw new HttpError(404, 'Media not found');
 
-  // Delete R2 first. If the subsequent D1 deletion fails, a retry remains safe:
-  // R2 delete is idempotent and the metadata row still identifies what to clean up.
-  await env.MEDIA.delete(row.object_key);
-
+  // Remove the public index first, then delete the private object. If R2 deletion
+  // fails, restore the D1 row so the operation is safely retryable and the two
+  // stores do not silently diverge.
   await env.DB.prepare('DELETE FROM media WHERE id = ?1')
     .bind(id)
     .run();
+
+  try {
+    await env.MEDIA.delete(row.object_key);
+  } catch (error) {
+    try {
+      await insertMediaRow(env, row);
+    } catch {
+      throw new HttpError(500, 'Delete failed and metadata recovery also failed');
+    }
+    throw error;
+  }
 
   return json({ ok: true, id });
 }
