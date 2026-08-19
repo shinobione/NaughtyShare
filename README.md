@@ -52,9 +52,9 @@ Google Photos Picker will plug into the same authenticated import API during Pha
 - Cloudflare Access JWTs are signature-validated by the Worker; an email header alone is never trusted.
 - Exact authorized emails are checked a second time in the Worker through `ALLOWED_EMAILS`.
 
-## Current implementation — v0.4.0 candidate
+## Current implementation — v0.4.0 production
 
-The production Secure Vault is active on Cloudflare. v0.4.0 adds the Phase 1.5 gallery-management candidate; production remains on the previous deployed build until the manual production workflow is run after merge.
+The production Secure Vault is active on Cloudflare. v0.4.0 is deployed and its main Phase 1.5 gallery-management flows have been smoke-tested successfully in production.
 
 Implemented and smoke-tested foundation:
 
@@ -75,14 +75,15 @@ Implemented and smoke-tested foundation:
 - Production video upload/playback/seek smoke test passed.
 - Persistent FR/VN interface switch with Vietnamese browser-locale defaulting.
 
-v0.4.0 candidate additionally includes:
+v0.4.0 production additionally includes and has been validated for:
 
 - persisted sorting by name, media type, duration and upload date;
 - authenticated rename/delete actions;
 - compensating D1/R2 delete flow;
 - expanded photo/video lightbox with previous/next navigation;
 - NaughtyShare storage count/bytes summary from the D1 index;
-- complete FR/VN strings for the new management UI.
+- complete FR/VN strings for the new management UI;
+- production smoke pass for sorting, storage counter, rename, delete and expanded photo/video viewer.
 
 Remaining Phase 1 closeout: validate the second authorized user flow with Trân.
 
@@ -109,7 +110,7 @@ Remaining Phase 1 closeout: validate the second authorized user flow with Trân.
 - [x] Production video playback + seek smoke test
 - [ ] Second-user production smoke test with Trân
 
-### Phase 1.5 — Gallery management & viewer **ACTIVE**
+### Phase 1.5 — Gallery management & viewer **PRODUCTION SMOKE PASS**
 
 #### Sorting and metadata
 - [x] Sort gallery by **name**
