@@ -56,26 +56,30 @@ jobs:
           printf '%s\n' \
             'ACCESS_TEAM_DOMAIN=bootstrap.invalid' \
             'ACCESS_AUD=bootstrap-locked' \
-            'ALLOWED_EMAILS=nobody@example.invalid' > .env.production
+            'ALLOWED_EMAILS=nobody@example.invalid' \
+            'GOOGLE_PHOTOS_CLIENT_ID=bootstrap-invalid' \
+            'GOOGLE_PHOTOS_CLIENT_SECRET=bootstrap-invalid' > .env.production
 
-      - name: Prepare real Access secrets
+      - name: Prepare real Access and Google Photos secrets
         if: ${{ github.event.inputs.mode == 'production' }}
         shell: bash
         env:
           ACCESS_TEAM_DOMAIN: ${{ secrets.ACCESS_TEAM_DOMAIN }}
           ACCESS_AUD: ${{ secrets.ACCESS_AUD }}
           ALLOWED_EMAILS: ${{ secrets.ALLOWED_EMAILS }}
+          GOOGLE_PHOTOS_CLIENT_ID: ${{ secrets.GOOGLE_PHOTOS_CLIENT_ID }}
+          GOOGLE_PHOTOS_CLIENT_SECRET: ${{ secrets.GOOGLE_PHOTOS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           umask 077
-          for name in ACCESS_TEAM_DOMAIN ACCESS_AUD ALLOWED_EMAILS; do
+          for name in ACCESS_TEAM_DOMAIN ACCESS_AUD ALLOWED_EMAILS GOOGLE_PHOTOS_CLIENT_ID GOOGLE_PHOTOS_CLIENT_SECRET; do
             if [ -z "${!name:-}" ]; then
               echo "Missing required GitHub production secret: $name" >&2
               exit 1
             fi
           done
-          printf 'ACCESS_TEAM_DOMAIN=%s\nACCESS_AUD=%s\nALLOWED_EMAILS=%s\n' \
-            "$ACCESS_TEAM_DOMAIN" "$ACCESS_AUD" "$ALLOWED_EMAILS" > .env.production
+          printf 'ACCESS_TEAM_DOMAIN=%s\nACCESS_AUD=%s\nALLOWED_EMAILS=%s\nGOOGLE_PHOTOS_CLIENT_ID=%s\nGOOGLE_PHOTOS_CLIENT_SECRET=%s\n' \
+            "$ACCESS_TEAM_DOMAIN" "$ACCESS_AUD" "$ALLOWED_EMAILS" "$GOOGLE_PHOTOS_CLIENT_ID" "$GOOGLE_PHOTOS_CLIENT_SECRET" > .env.production
 
       - name: Deploy Worker and secrets atomically
         env:
