@@ -91,6 +91,18 @@ function safeFilename(raw) {
     .slice(0, 240) || 'media';
 }
 
+function safeDisplayName(raw) {
+  if (typeof raw !== 'string') throw new HttpError(400, 'A media name is required');
+  const cleaned = raw
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/[\\/]/g, '_')
+    .trim()
+    .slice(0, 240);
+
+  if (!cleaned) throw new HttpError(400, 'A media name is required');
+  return cleaned;
+}
+
 function publicMedia(row) {
   return {
     id: row.id,
@@ -101,6 +113,17 @@ function publicMedia(row) {
     createdAt: row.created_at,
     url: `/media/${encodeURIComponent(row.id)}`,
   };
+}
+
+async function getMediaRow(env, id) {
+  return env.DB.prepare(
+    `SELECT id, object_key, original_name, content_type, size_bytes, uploaded_by, created_at
+     FROM media
+     WHERE id = ?1
+     LIMIT 1`,
+  )
+    .bind(id)
+    .first();
 }
 
 async function health(env, user) {
@@ -118,14 +141,26 @@ async function health(env, user) {
 }
 
 async function listMedia(env) {
-  const result = await env.DB.prepare(
-    `SELECT id, original_name, content_type, size_bytes, uploaded_by, created_at
-     FROM media
-     ORDER BY created_at DESC
-     LIMIT 200`,
-  ).all();
+  const [result, totals] = await Promise.all([
+    env.DB.prepare(
+      `SELECT id, original_name, content_type, size_bytes, uploaded_by, created_at
+       FROM media
+       ORDER BY created_at DESC
+       LIMIT 500`,
+    ).all(),
+    env.DB.prepare(
+      `SELECT COUNT(*) AS count, COALESCE(SUM(size_bytes), 0) AS size_bytes
+       FROM media`,
+    ).first(),
+  ]);
 
-  return json({ items: (result.results ?? []).map(publicMedia) });
+  return json({
+    items: (result.results ?? []).map(publicMedia),
+    stats: {
+      count: Number(totals?.count ?? 0),
+      sizeBytes: Number(totals?.size_bytes ?? 0),
+    },
+  });
 }
 
 async function uploadMedia(request, env, user) {
@@ -197,16 +232,42 @@ async function uploadMedia(request, env, user) {
   return json({ item: publicMedia(row) }, 201);
 }
 
-async function serveMedia(request, env, id) {
-  const row = await env.DB.prepare(
-    `SELECT id, object_key, original_name, content_type, size_bytes, uploaded_by, created_at
-     FROM media
-     WHERE id = ?1
-     LIMIT 1`,
-  )
-    .bind(id)
-    .first();
+async function renameMedia(request, env, id) {
+  const row = await getMediaRow(env, id);
+  if (!row) throw new HttpError(404, 'Media not found');
 
+  const body = await request.json().catch(() => null);
+  const newName = safeDisplayName(body?.name);
+
+  await env.DB.prepare(
+    `UPDATE media
+     SET original_name = ?1
+     WHERE id = ?2`,
+  )
+    .bind(newName, id)
+    .run();
+
+  row.original_name = newName;
+  return json({ item: publicMedia(row) });
+}
+
+async function deleteMedia(env, id) {
+  const row = await getMediaRow(env, id);
+  if (!row) throw new HttpError(404, 'Media not found');
+
+  // Delete R2 first. If the subsequent D1 deletion fails, a retry remains safe:
+  // R2 delete is idempotent and the metadata row still identifies what to clean up.
+  await env.MEDIA.delete(row.object_key);
+
+  await env.DB.prepare('DELETE FROM media WHERE id = ?1')
+    .bind(id)
+    .run();
+
+  return json({ ok: true, id });
+}
+
+async function serveMedia(request, env, id) {
+  const row = await getMediaRow(env, id);
   if (!row) throw new HttpError(404, 'Media not found');
 
   const rangeHeader = request.headers.get('range');
@@ -277,6 +338,19 @@ export default {
 
       if (request.method === 'POST' && url.pathname === '/api/media') {
         return await uploadMedia(request, env, user);
+      }
+
+      if (url.pathname.startsWith('/api/media/')) {
+        const id = decodeURIComponent(url.pathname.slice('/api/media/'.length));
+        if (!id) throw new HttpError(404, 'Media not found');
+
+        if (request.method === 'PATCH') {
+          return await renameMedia(request, env, id);
+        }
+
+        if (request.method === 'DELETE') {
+          return await deleteMedia(env, id);
+        }
       }
 
       if (request.method === 'GET' && url.pathname.startsWith('/media/')) {
