@@ -1,5 +1,5 @@
 const POLL_FALLBACK_MS = 1800;
-const MAX_POLL_MS = 5 * 60 * 1000;
+const INITIAL_POLL_TIMEOUT_MS = 15 * 60 * 1000;
 
 function isVietnamese() {
   return document.documentElement.lang?.toLowerCase().startsWith('vi');
@@ -118,12 +118,18 @@ async function importAllBatches() {
 }
 
 async function waitForSelection(popup) {
-  const startedAt = Date.now();
   let waitMs = POLL_FALLBACK_MS;
+  let pollDeadline = Date.now() + INITIAL_POLL_TIMEOUT_MS;
   let closedGracePolls = 0;
 
-  while (Date.now() - startedAt < MAX_POLL_MS) {
-    await sleep(waitMs);
+  while (true) {
+    const remainingMs = pollDeadline - Date.now();
+    if (remainingMs <= 0) {
+      await cancelSession();
+      throw new Error('timeout');
+    }
+
+    await sleep(Math.min(waitMs, remainingMs));
 
     let status;
     try {
@@ -147,6 +153,15 @@ async function waitForSelection(popup) {
       waitMs = Math.min(5000, Math.max(700, Number(status.pollIntervalMs)));
     }
 
+    if (Number.isFinite(Number(status?.timeoutMs))) {
+      const timeoutMs = Math.max(0, Number(status.timeoutMs));
+      if (timeoutMs === 0) {
+        await cancelSession();
+        throw new Error('timeout');
+      }
+      pollDeadline = Date.now() + timeoutMs;
+    }
+
     if (popup?.closed) {
       closedGracePolls += 1;
       if (closedGracePolls >= 3) {
@@ -157,9 +172,6 @@ async function waitForSelection(popup) {
       closedGracePolls = 0;
     }
   }
-
-  await cancelSession();
-  throw new Error('timeout');
 }
 
 async function startPicker() {
@@ -213,7 +225,10 @@ async function startPicker() {
       );
     } else if (code === 'timeout') {
       notice(
-        copy('Google Photos n’a pas terminé la sélection à temps.', 'Google Photos chưa hoàn tất lựa chọn kịp thời.'),
+        copy(
+          'La fenêtre de sélection Google Photos a expiré. Relance l’import quand tu es prêt à choisir.',
+          'Phiên chọn Google Photos đã hết thời gian. Hãy nhập lại khi bạn sẵn sàng chọn.',
+        ),
         'error',
       );
     } else if (code === 'cancelled') {
