@@ -117,10 +117,9 @@ async function importAllBatches() {
   window.setTimeout(() => window.location.reload(), 900);
 }
 
-async function waitForSelection(popup) {
+async function waitForSelection() {
   let waitMs = POLL_FALLBACK_MS;
   let pollDeadline = Date.now() + INITIAL_POLL_TIMEOUT_MS;
-  let closedGracePolls = 0;
 
   while (true) {
     const remainingMs = pollDeadline - Date.now();
@@ -135,8 +134,9 @@ async function waitForSelection(popup) {
     try {
       status = await getStatus();
     } catch {
-      if (popup?.closed) closedGracePolls += 1;
-      if (closedGracePolls >= 3) throw new Error('cancelled');
+      // OAuth and Google Photos may hand the flow across browser contexts.
+      // A popup/window reference can report closed while the Picker session
+      // is still active, so session state remains the only cancellation truth.
       continue;
     }
 
@@ -160,16 +160,6 @@ async function waitForSelection(popup) {
         throw new Error('timeout');
       }
       pollDeadline = Date.now() + timeoutMs;
-    }
-
-    if (popup?.closed) {
-      closedGracePolls += 1;
-      if (closedGracePolls >= 3) {
-        await cancelSession();
-        throw new Error('cancelled');
-      }
-    } else {
-      closedGracePolls = 0;
     }
   }
 }
@@ -215,7 +205,7 @@ async function startPicker() {
   window.addEventListener('message', onMessage);
 
   try {
-    await waitForSelection(popup);
+    await waitForSelection();
   } catch (error) {
     const code = error instanceof Error ? error.message : '';
     if (code === 'expired') {
@@ -230,11 +220,6 @@ async function startPicker() {
           'Phiên chọn Google Photos đã hết thời gian. Hãy nhập lại khi bạn sẵn sàng chọn.',
         ),
         'error',
-      );
-    } else if (code === 'cancelled') {
-      notice(
-        copy('Import Google Photos annulé.', 'Đã hủy nhập Google Photos.'),
-        'working',
       );
     } else {
       notice(
