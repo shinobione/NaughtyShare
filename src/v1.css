@@ -139,15 +139,19 @@
   box-shadow: inset 0 0 0 1px rgba(244, 191, 100, 0.04);
 }
 
-/* v1 does not cache private media in the PWA. These hints only reduce layout
-   and decode work for cards that are far outside the viewport. */
-#gallery .media-card {
+/* Keep Masonry fully measurable because its layout code reads real card heights.
+   Comfort/Compact can use content-visibility to skip far-off rendering work. */
+#gallery:not([data-gallery-view="masonry"]) .media-card {
   content-visibility: auto;
   contain-intrinsic-size: 260px 330px;
 }
 
 #gallery[data-gallery-view="compact"] .media-card {
   contain-intrinsic-size: 150px 190px;
+}
+
+#gallery[data-gallery-view="masonry"] .media-card {
+  content-visibility: visible;
 }
 
 #gallery .media-preview {
