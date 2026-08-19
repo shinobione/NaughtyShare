@@ -166,7 +166,7 @@ function saveDismissed(values) {
   try {
     localStorage.setItem(DISMISSED_KEY, JSON.stringify([...values].slice(-80)));
   } catch {
-    // Suggestions can still be dismissed for the current render only.
+    // Dismissal persistence is optional.
   }
 }
 
@@ -309,7 +309,11 @@ function renderSuggestion(suggestion) {
   const preview = document.createElement('div');
   preview.className = 'smart-preview';
   for (const id of suggestion.ids.slice(0, 3)) preview.append(previewNode(mediaFor(id)));
-  while (preview.children.length < 3) preview.append(document.createElement('span')).className = 'smart-preview-cell';
+  while (preview.children.length < 3) {
+    const filler = document.createElement('span');
+    filler.className = 'smart-preview-cell';
+    preview.append(filler);
+  }
   card.append(preview);
 
   const content = document.createElement('div');
@@ -415,6 +419,7 @@ async function createMoment(suggestion) {
   const description = suggestion.type === 'day'
     ? tr('descriptionDay', suggestion.ids.length)
     : tr('descriptionPeriod', suggestion.ids.length, suggestion.dayCount);
+  let createdCollectionId = null;
 
   try {
     const created = await api('/api/library/collections', {
@@ -428,17 +433,23 @@ async function createMoment(suggestion) {
         tone: (toneDate.getMonth() + suggestion.ids.length) % 6,
       }),
     });
-    const collectionId = created?.collection?.id;
-    if (!collectionId) throw new Error('Collection id missing');
+    createdCollectionId = created?.collection?.id || null;
+    if (!createdCollectionId) throw new Error('Collection id missing');
 
     const tasks = suggestion.ids.map((mediaId) => () => api(
-      `/api/library/collections/${encodeURIComponent(collectionId)}/items/${encodeURIComponent(mediaId)}`,
+      `/api/library/collections/${encodeURIComponent(createdCollectionId)}/items/${encodeURIComponent(mediaId)}`,
       { method: 'PUT' },
     ));
     await runPool(tasks, 5, (done, total) => setNotice(tr('creating', done, total), 'working'));
     setNotice(tr('created', name, suggestion.ids.length), 'ok');
     window.setTimeout(() => window.location.reload(), 500);
   } catch (error) {
+    if (createdCollectionId) {
+      await fetch(`/api/library/collections/${encodeURIComponent(createdCollectionId)}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      }).catch(() => {});
+    }
     setNotice(error instanceof Error && error.message ? `${tr('failed')} ${error.message}` : tr('failed'), 'error');
     busySignature = null;
     render();
