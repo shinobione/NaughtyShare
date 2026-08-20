@@ -1,4 +1,4 @@
-const CACHE = 'naughtyshare-shell-v4';
+const CACHE = 'naughtyshare-shell-v5';
 const APP_SHELL = ['/manifest.webmanifest', '/icons/naughtyshare.svg'];
 
 self.addEventListener('install', (event) => {
@@ -21,8 +21,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Never cache API responses or private media.
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/media/')) return;
+  // Never cache API responses, private media, or derived private thumbnails.
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/media/') || url.pathname.startsWith('/thumbnail/')) return;
 
   // NaughtyShare is an authenticated online vault. Never serve cached HTML or
   // JavaScript because that can keep an installed PWA on an old UI after a deploy.
