@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'bootstrap = locked first deploy; production = real Access secrets'
+        description: 'production = normal deploy; bootstrap = locked first deploy only'
         required: true
-        default: bootstrap
+        default: production
         type: choice
         options:
-          - bootstrap
           - production
+          - bootstrap
       confirm:
         description: 'Type DEPLOY to authorize the release'
         required: true
