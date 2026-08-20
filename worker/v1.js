@@ -58,6 +58,95 @@ async function mediaExists(env, mediaId) {
   return Boolean(row?.id);
 }
 
+async function mediaDeliveryRow(env, mediaId) {
+  return env.DB.prepare(
+    `SELECT object_key, content_type, size_bytes
+     FROM media
+     WHERE id = ?1
+     LIMIT 1`,
+  ).bind(mediaId).first();
+}
+
+function parseByteRange(header, totalSize) {
+  if (!header) return null;
+  const value = String(header).trim();
+  if (value.includes(',')) return { invalid: true };
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(value);
+  if (!match || (!match[1] && !match[2])) return { invalid: true };
+
+  if (!match[1]) {
+    const suffix = Number(match[2]);
+    if (!Number.isSafeInteger(suffix) || suffix <= 0 || totalSize <= 0) return { invalid: true };
+    const length = Math.min(suffix, totalSize);
+    const start = totalSize - length;
+    return { start, end: totalSize - 1, length };
+  }
+
+  const start = Number(match[1]);
+  if (!Number.isSafeInteger(start) || start < 0 || start >= totalSize) return { invalid: true };
+
+  let end = totalSize - 1;
+  if (match[2]) {
+    const requestedEnd = Number(match[2]);
+    if (!Number.isSafeInteger(requestedEnd) || requestedEnd < start) return { invalid: true };
+    end = Math.min(requestedEnd, totalSize - 1);
+  }
+
+  return { start, end, length: end - start + 1 };
+}
+
+function mediaHeaders(metadata, row) {
+  const headers = new Headers();
+  metadata.writeHttpMetadata(headers);
+  headers.set('content-type', row.content_type);
+  headers.set('cache-control', 'private, no-store');
+  headers.set('etag', metadata.httpEtag);
+  headers.set('accept-ranges', 'bytes');
+  headers.set('x-content-type-options', 'nosniff');
+  headers.set('referrer-policy', 'no-referrer');
+  headers.set('content-disposition', 'inline');
+  return headers;
+}
+
+async function serveMediaCompat(request, env, ctx, mediaId) {
+  const authFailure = await authenticateViaMoments(request, env, ctx);
+  if (authFailure) return authFailure;
+
+  const row = await mediaDeliveryRow(env, mediaId);
+  if (!row) throw new HttpError(404, 'Media not found');
+
+  const metadata = await env.MEDIA.head(row.object_key);
+  if (!metadata) throw new HttpError(404, 'Media object not found');
+  const totalSize = Number(metadata.size || row.size_bytes || 0);
+  const headers = mediaHeaders(metadata, row);
+  const range = parseByteRange(request.headers.get('range'), totalSize);
+
+  if (range?.invalid) {
+    headers.set('content-range', `bytes */${totalSize}`);
+    headers.set('content-length', '0');
+    return new Response(null, { status: 416, headers });
+  }
+
+  if (range) {
+    headers.set('content-range', `bytes ${range.start}-${range.end}/${totalSize}`);
+    headers.set('content-length', String(range.length));
+    if (request.method === 'HEAD') return new Response(null, { status: 206, headers });
+
+    const object = await env.MEDIA.get(row.object_key, {
+      range: { offset: range.start, length: range.length },
+    });
+    if (!object || !('body' in object)) throw new HttpError(404, 'Media object not found');
+    return new Response(object.body, { status: 206, headers });
+  }
+
+  headers.set('content-length', String(totalSize));
+  if (request.method === 'HEAD') return new Response(null, { status: 200, headers });
+
+  const object = await env.MEDIA.get(row.object_key);
+  if (!object || !('body' in object)) throw new HttpError(404, 'Media object not found');
+  return new Response(object.body, { status: 200, headers });
+}
+
 async function readJsonObject(env, key) {
   const object = await env.MEDIA.get(key);
   if (!object || !('body' in object)) return null;
@@ -191,6 +280,11 @@ export default {
     const url = new URL(request.url);
 
     try {
+      if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname.startsWith('/media/')) {
+        const mediaId = safeId(url.pathname.slice('/media/'.length));
+        return await serveMediaCompat(request, env, ctx, mediaId);
+      }
+
       if (request.method === 'GET' && url.pathname === '/api/media') {
         return await enrichMediaList(request, env, ctx);
       }
