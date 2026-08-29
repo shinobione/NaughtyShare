@@ -9,7 +9,29 @@ function requireMatch(pattern, message) {
 
 requireMatch(/"preview_urls"\s*:\s*false/, 'preview_urls must be explicitly false');
 requireMatch(/"run_worker_first"\s*:\s*true/, 'assets.run_worker_first must be true so authentication gates the PWA shell');
-requireMatch(/"main"\s*:\s*"worker\/v1\.js"/, 'worker entry must route through worker/v1.js so the v1 backend canary stays behind Access');
+
+const workerEntry = config.match(/"main"\s*:\s*"([^"]+)"/)?.[1];
+if (!workerEntry) {
+  failures.push('wrangler main worker entry is missing');
+} else if (workerEntry === 'worker/v1.js') {
+  // Canonical production entrypoint.
+} else if (workerEntry === 'worker/media-poc.js') {
+  // The Media Transformations POC is intentionally isolated above v1.js.
+  // Only allow this exact wrapper when it demonstrably imports v1, authenticates
+  // POC routes through v1, and delegates every unmatched request back to v1.
+  const wrapper = await readFile(new URL(`../${workerEntry}`, import.meta.url), 'utf8');
+  const requiredWrapperMarkers = [
+    [/import\s+v1Worker\s+from\s+['"]\.\/v1\.js['"]/, 'POC wrapper must import worker/v1.js'],
+    [/async\s+function\s+authenticateViaV1\s*\(/, 'POC wrapper must authenticate compatibility routes through v1'],
+    [/const\s+authFailure\s*=\s*await\s+authenticateViaV1\(request,\s*env,\s*ctx\)/, 'POC routes must call the v1 auth gate'],
+    [/return\s+v1Worker\.fetch\(request,\s*env,\s*ctx\)\s*;/, 'POC wrapper must delegate unmatched requests to v1'],
+  ];
+  for (const [pattern, message] of requiredWrapperMarkers) {
+    if (!pattern.test(wrapper)) failures.push(message);
+  }
+} else {
+  failures.push(`worker entry ${workerEntry} is not an approved production entrypoint`);
+}
 
 for (const secret of [
   'ACCESS_TEAM_DOMAIN',
@@ -51,5 +73,6 @@ if (failures.length) {
 }
 
 console.log('NaughtyShare production preflight PASS');
+console.log(`Worker entry validated: ${workerEntry}`);
 console.log(`Exposure mode: ${customDomain ? `custom domain ${customDomain}` : 'workers.dev protected by Cloudflare Access'}`);
 console.log(`D1 database ID configured: ${databaseId}`);
