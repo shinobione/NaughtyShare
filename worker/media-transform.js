@@ -1,6 +1,7 @@
 const DERIVATIVE_PREFIX = 'app-data/v1/compat-video/';
 const MAX_INPUT_BYTES = 100 * 1024 * 1024;
 const MAX_OUTPUT_SECONDS = 60;
+const OUTPUT_CONTENT_TYPE = 'video/mp4';
 
 function httpError(status, message) {
   const error = new Error(message);
@@ -57,7 +58,7 @@ export async function getCompatDerivative(env, mediaId) {
     state: 'ready',
     url: `/compat-media/${encodeURIComponent(mediaId)}`,
     sizeBytes: Number(object.size || 0),
-    contentType: object.httpMetadata?.contentType || 'video/mp4',
+    contentType: OUTPUT_CONTENT_TYPE,
   });
 }
 
@@ -89,6 +90,7 @@ export async function createCompatDerivative(request, env, mediaId) {
       created: false,
       url: `/compat-media/${encodeURIComponent(mediaId)}`,
       sizeBytes: Number(existing.size || 0),
+      contentType: OUTPUT_CONTENT_TYPE,
     });
   }
 
@@ -105,14 +107,10 @@ export async function createCompatDerivative(request, env, mediaId) {
         audio: true,
       });
 
-    const [media, contentType] = await Promise.all([
-      result.media(),
-      result.contentType(),
-    ]);
-
-    const stored = await env.MEDIA.put(key, media, {
+    const transformedMedia = await result.media();
+    const stored = await env.MEDIA.put(key, transformedMedia, {
       httpMetadata: {
-        contentType: contentType || 'video/mp4',
+        contentType: OUTPUT_CONTENT_TYPE,
         cacheControl: 'private, no-store',
       },
       customMetadata: {
@@ -133,7 +131,7 @@ export async function createCompatDerivative(request, env, mediaId) {
       created: true,
       url: `/compat-media/${encodeURIComponent(mediaId)}`,
       sizeBytes: Number(stored.size || 0),
-      contentType: contentType || 'video/mp4',
+      contentType: OUTPUT_CONTENT_TYPE,
     }, 201);
   } catch (error) {
     if (Number.isInteger(error?.status)) throw error;
