@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Production preflight
+        run: npm run preflight:production
+
       - name: Build and validate Worker bundle
         run: npm run check
 
