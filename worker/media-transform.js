@@ -1,6 +1,7 @@
 const DERIVATIVE_PREFIX = 'app-data/v1/compat-video/';
 const MAX_INPUT_BYTES = 100 * 1024 * 1024;
 const MAX_OUTPUT_SECONDS = 60;
+const MAX_BUFFERED_OUTPUT_BYTES = 64 * 1024 * 1024;
 const OUTPUT_CONTENT_TYPE = 'video/mp4';
 
 function httpError(status, message) {
@@ -107,10 +108,6 @@ export async function createCompatDerivative(request, env, mediaId) {
         audio: true,
       });
 
-    // result.media() currently produces an ordinary ReadableStream in the beta.
-    // R2 single-part put requires a known-length stream and can reject that output.
-    // result.response().body keeps the runtime's HTTP-body provenance, which R2
-    // accepts as a known-length request/response body without buffering the video.
     transformedResponse = await result.response();
   } catch (error) {
     const detail = Number.isFinite(Number(error?.code))
@@ -132,9 +129,32 @@ export async function createCompatDerivative(request, env, mediaId) {
     transformedResponse.headers.get('content-type') || OUTPUT_CONTENT_TYPE
   ).split(';')[0].trim() || OUTPUT_CONTENT_TYPE;
 
+  const declaredLength = Number(transformedResponse.headers.get('content-length') || 0);
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_BUFFERED_OUTPUT_BYTES) {
+    throw httpError(413, 'Compatibility derivative exceeds the 64 MB buffered POC limit');
+  }
+
+  let transformedBytes;
+  try {
+    // The Media Transformations beta currently yields an ordinary ReadableStream.
+    // R2 rejects that stream because it does not carry a known length, even when
+    // obtained from result.response(). Buffering converts it to an ArrayBuffer,
+    // which is an accepted fixed-size R2 put value for this deliberately short POC.
+    transformedBytes = await transformedResponse.arrayBuffer();
+  } catch (error) {
+    throw httpError(502, `Compatibility derivative buffering failed: ${error?.message || 'unknown error'}`);
+  }
+
+  if (!transformedBytes.byteLength) {
+    throw httpError(502, 'Media Transformations returned an empty compatibility derivative');
+  }
+  if (transformedBytes.byteLength > MAX_BUFFERED_OUTPUT_BYTES) {
+    throw httpError(413, 'Compatibility derivative exceeds the 64 MB buffered POC limit');
+  }
+
   let stored;
   try {
-    stored = await env.MEDIA.put(key, transformedResponse.body, {
+    stored = await env.MEDIA.put(key, transformedBytes, {
       httpMetadata: {
         contentType: transformedContentType,
         cacheControl: 'private, no-store',
@@ -145,6 +165,7 @@ export async function createCompatDerivative(request, env, mediaId) {
         sourceContentType: String(row.content_type || '').slice(0, 128),
         generatedAt: new Date().toISOString(),
         transform: `h264-aac-full-short-video-${durationSeconds.toFixed(3)}s`,
+        bufferedBytes: String(transformedBytes.byteLength),
       },
     });
   } catch (error) {
@@ -159,7 +180,7 @@ export async function createCompatDerivative(request, env, mediaId) {
     state: 'ready',
     created: true,
     url: `/compat-media/${encodeURIComponent(mediaId)}`,
-    sizeBytes: Number(stored.size || 0),
+    sizeBytes: Number(stored.size || transformedBytes.byteLength || 0),
     contentType: transformedContentType,
   }, 201);
 }
