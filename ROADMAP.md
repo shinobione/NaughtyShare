@@ -8,15 +8,20 @@ Goal: make NaughtyShare video playback reliable on desktop, Android and iPhone b
 
 - [x] Strict authenticated HTTP byte-range delivery for `/media/:id`.
 - [x] iPhone authenticated blob fallback as a transport-vs-codec diagnostic.
-- [ ] Cloudflare Stream proof of concept for one existing video.
-- [ ] Keep the original video unchanged in private R2; Stream is a playback derivative only.
-- [ ] Require signed Stream playback URLs/tokens; never expose a permanent public Stream URL.
-- [ ] First POC limited to videos <= 200 MB and <= 1 hour, using the Workers Stream binding direct-upload path.
-- [ ] Production smoke on Trân's iPhone: open, play, seek, reopen.
-- [ ] Confirm deletion cleanup so deleting the NaughtyShare original also deletes its Stream derivative.
-- [ ] Decide derivative policy after the smoke: opt-in, automatic for new videos, or background preparation.
-- [ ] Add TUS-based Stream preparation for videos > 200 MB if Stream becomes the canonical playback path.
+- [ ] Cloudflare Media Transformations Workers-binding proof of concept for one existing video.
+- [ ] Keep the original video unchanged in private R2; the compatibility MP4 is a private playback derivative only.
+- [ ] Store the optimized H.264/AAC MP4 under private R2 `app-data/`; never expose a permanent public media URL.
+- [ ] Serve the derivative through an authenticated NaughtyShare endpoint with strict GET/HEAD byte ranges.
+- [ ] First POC limited to a source smaller than 100 MB and a video no longer than 60 seconds, matching the current transformation output limit.
+- [ ] Production smoke on Trân's iPhone: open, play, seek, close/reopen.
+- [ ] Confirm deletion cleanup so deleting the NaughtyShare original also deletes its compatibility derivative.
+- [ ] Decide derivative policy after the smoke: opt-in, automatic for compatible new videos, or background preparation.
+- [ ] If universal playback needs videos beyond the Media Transformations limits, re-evaluate paid Cloudflare Stream or another long-form transcoding path.
 - [ ] Retire the temporary iOS blob fallback after universal playback is proven.
+
+### POC implementation rule
+
+The Media Transformations binding is deliberately isolated above the existing v1-compatible Worker. The R2 binding remains `env.MEDIA`; the transformation binding uses a separate `env.VIDEO_TRANSFORM` name so the private bucket binding is never shadowed. No Stream subscription, Stream video library, new API key or new D1 migration is required for this POC.
 
 ## Phase 6 — NaughtyShare Together — PLANNED
 
