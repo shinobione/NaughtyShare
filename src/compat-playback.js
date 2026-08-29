@@ -122,6 +122,7 @@ function activateCompatPlayback(video, url) {
   if (!video || !url || video.dataset.compatPlayback === 'active') return;
   const resumeAt = Number.isFinite(video.currentTime) ? video.currentTime : 0;
   video.dataset.compatPlayback = 'active';
+  video.dataset.compatState = 'active';
   video.dataset.compatOriginalSrc = video.getAttribute('src') || '';
   video.pause();
   video.src = url;
@@ -140,17 +141,21 @@ function activateCompatPlayback(video, url) {
 }
 
 async function checkDerivative(video, mediaId) {
+  video.dataset.compatState = 'checking';
   const { response, data } = await requestJson(`/api/v1/compat-video/${encodeURIComponent(mediaId)}`);
   const status = viewerStatus();
   if (response.status === 404) {
+    video.dataset.compatState = 'none';
     if (status) status.textContent = copy().none;
     return { state: 'none' };
   }
   if (!response.ok) {
+    video.dataset.compatState = 'error';
     if (status) status.textContent = `${copy().failed} · ${data?.error || `HTTP ${response.status}`}`;
     return { state: 'error' };
   }
   if (data.state === 'ready' && data.url) {
+    video.dataset.compatState = 'ready';
     if (status) status.textContent = copy().ready;
     if (isAppleMobileWebKit()) activateCompatPlayback(video, data.url);
   }
@@ -183,6 +188,7 @@ async function prepareDerivative(video, mediaId, button) {
     if (!Number.isFinite(durationSeconds)) throw new Error(text.durationUnknown);
     if (durationSeconds > MAX_COMPAT_SECONDS) throw new Error(text.tooLong);
 
+    video.dataset.compatState = 'converting';
     if (status) status.textContent = text.converting;
     const { response, data } = await requestJson(`/api/v1/compat-video/${encodeURIComponent(mediaId)}`, {
       method: 'POST',
@@ -194,9 +200,11 @@ async function prepareDerivative(video, mediaId, button) {
       throw new Error(data?.error || `HTTP ${response.status}`);
     }
 
+    video.dataset.compatState = 'ready';
     if (status) status.textContent = text.ready;
     if (isAppleMobileWebKit() && data.url) activateCompatPlayback(video, data.url);
   } catch (error) {
+    video.dataset.compatState = 'error';
     if (status) status.textContent = `${text.failed} · ${error?.message || 'unknown error'}`;
   } finally {
     button.disabled = false;
