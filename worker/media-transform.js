@@ -97,6 +97,7 @@ export async function createCompatDerivative(request, env, mediaId) {
   const source = await env.MEDIA.get(row.object_key);
   if (!source || !('body' in source)) throw httpError(404, 'Source video object not found');
 
+  let transformedResponse;
   try {
     const result = env.VIDEO_TRANSFORM
       .input(source.body)
@@ -106,10 +107,36 @@ export async function createCompatDerivative(request, env, mediaId) {
         audio: true,
       });
 
-    const transformedMedia = await result.media();
-    const stored = await env.MEDIA.put(key, transformedMedia, {
+    // result.media() currently produces an ordinary ReadableStream in the beta.
+    // R2 single-part put requires a known-length stream and can reject that output.
+    // result.response().body keeps the runtime's HTTP-body provenance, which R2
+    // accepts as a known-length request/response body without buffering the video.
+    transformedResponse = await result.response();
+  } catch (error) {
+    const detail = Number.isFinite(Number(error?.code))
+      ? `Media Transformations error ${error.code}`
+      : 'Media Transformations failed';
+    throw httpError(502, `${detail}: ${error?.message || 'unknown error'}`);
+  }
+
+  if (!transformedResponse?.ok) {
+    const detail = await transformedResponse?.text().catch(() => '');
+    throw httpError(
+      502,
+      `Media Transformations returned HTTP ${transformedResponse?.status || '?'}${detail ? `: ${detail.slice(0, 240)}` : ''}`,
+    );
+  }
+  if (!transformedResponse.body) throw httpError(502, 'Media Transformations returned an empty response body');
+
+  const transformedContentType = (
+    transformedResponse.headers.get('content-type') || OUTPUT_CONTENT_TYPE
+  ).split(';')[0].trim() || OUTPUT_CONTENT_TYPE;
+
+  let stored;
+  try {
+    stored = await env.MEDIA.put(key, transformedResponse.body, {
       httpMetadata: {
-        contentType: OUTPUT_CONTENT_TYPE,
+        contentType: transformedContentType,
         cacheControl: 'private, no-store',
       },
       customMetadata: {
@@ -120,25 +147,21 @@ export async function createCompatDerivative(request, env, mediaId) {
         transform: `h264-aac-full-short-video-${durationSeconds.toFixed(3)}s`,
       },
     });
-
-    if (!stored) throw httpError(502, 'Compatibility derivative was not stored');
-
-    return json({
-      ok: true,
-      mediaId,
-      state: 'ready',
-      created: true,
-      url: `/compat-media/${encodeURIComponent(mediaId)}`,
-      sizeBytes: Number(stored.size || 0),
-      contentType: OUTPUT_CONTENT_TYPE,
-    }, 201);
   } catch (error) {
-    if (Number.isInteger(error?.status)) throw error;
-    const detail = Number.isFinite(Number(error?.code))
-      ? `Media Transformations error ${error.code}`
-      : 'Media Transformations failed';
-    throw httpError(502, `${detail}: ${error?.message || 'unknown error'}`);
+    throw httpError(502, `R2 derivative storage failed: ${error?.message || 'unknown error'}`);
   }
+
+  if (!stored) throw httpError(502, 'R2 derivative storage failed: object was not stored');
+
+  return json({
+    ok: true,
+    mediaId,
+    state: 'ready',
+    created: true,
+    url: `/compat-media/${encodeURIComponent(mediaId)}`,
+    sizeBytes: Number(stored.size || 0),
+    contentType: transformedContentType,
+  }, 201);
 }
 
 export async function cleanupCompatDerivative(env, mediaId) {
