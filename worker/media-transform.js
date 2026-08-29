@@ -39,7 +39,7 @@ function parseDurationSeconds(value) {
   if (!Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_OUTPUT_SECONDS) {
     throw httpError(422, 'Media Transformations POC requires a video duration between 1 and 60 seconds');
   }
-  return Math.max(1, Math.ceil(seconds));
+  return seconds;
 }
 
 export async function getCompatDerivative(env, mediaId) {
@@ -103,7 +103,6 @@ export async function createCompatDerivative(request, env, mediaId) {
       .output({
         mode: 'video',
         time: '0s',
-        duration: `${durationSeconds}s`,
         audio: true,
       });
 
@@ -118,7 +117,7 @@ export async function createCompatDerivative(request, env, mediaId) {
         sourceObjectKey: String(row.object_key).slice(0, 1024),
         sourceContentType: String(row.content_type || '').slice(0, 128),
         generatedAt: new Date().toISOString(),
-        transform: `h264-aac-${durationSeconds}s`,
+        transform: `h264-aac-full-short-video-${durationSeconds.toFixed(3)}s`,
       },
     });
 
