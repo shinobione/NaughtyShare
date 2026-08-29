@@ -145,6 +145,9 @@ export async function provisionStreamDerivative(request, env, mediaId) {
       if (state === 'ready') {
         return json({ ok: true, mediaId, state: 'ready', uploadRequired: false });
       }
+      if (details.uploaded && state !== 'error') {
+        return json({ ok: true, mediaId, state, uploadRequired: false });
+      }
       if (
         existing.uploadUrl &&
         existing.uploadExpiresAt &&
