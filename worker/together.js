@@ -185,6 +185,7 @@ export class TogetherRoom extends DurableObject {
       participantId,
       sessionId: crypto.randomUUID(),
       joinedAt: Date.now(),
+      buffering: false,
     };
 
     this.ctx.acceptWebSocket(server, [`participant:${participantId}`]);
@@ -219,6 +220,7 @@ export class TogetherRoom extends DurableObject {
 
   presence(excludeSocket = null) {
     const participantIds = [];
+    const bufferingParticipants = [];
     let sessionCount = 0;
     for (const socket of this.ctx.getWebSockets()) {
       if (socket === excludeSocket || socket.readyState !== 1) continue;
@@ -227,9 +229,13 @@ export class TogetherRoom extends DurableObject {
       if (attachment?.participantId && !participantIds.includes(attachment.participantId)) {
         participantIds.push(attachment.participantId);
       }
+      if (attachment?.participantId && attachment?.buffering && !bufferingParticipants.includes(attachment.participantId)) {
+        bufferingParticipants.push(attachment.participantId);
+      }
     }
     return {
       participants: participantIds,
+      bufferingParticipants,
       participantCount: participantIds.length,
       sessionCount,
     };
@@ -345,6 +351,16 @@ export class TogetherRoom extends DurableObject {
       return;
     }
 
+    if (type === 'BUFFER') {
+      if (this.roomState.mediaId && String(data?.mediaId || '') !== this.roomState.mediaId) return;
+      socket.serializeAttachment({
+        ...attachment,
+        buffering: Boolean(data?.buffering),
+      });
+      this.broadcastPresence();
+      return;
+    }
+
     if (type === 'MEDIA') {
       let mediaId;
       try {
@@ -357,11 +373,13 @@ export class TogetherRoom extends DurableObject {
         this.sendError(socket, 'MEDIA_NOT_FOUND', 'Together media is missing or is not a video');
         return;
       }
+      socket.serializeAttachment({ ...attachment, buffering: false });
       await this.commitState(actor, 'media', {
         mediaId,
         playing: false,
         position: safePosition(data?.position),
       });
+      this.broadcastPresence();
       return;
     }
 
