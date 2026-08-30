@@ -259,6 +259,10 @@ function updatePresence(next) {
     participants: Array.isArray(next?.participants) ? next.participants : [],
   };
   if (!desiredConnection) return;
+  if (presence.participantCount >= 2 && roomState?.mediaId && currentMediaId && roomState.mediaId !== currentMediaId) {
+    offerRemoteMedia(roomState.mediaId);
+    return;
+  }
   if (presence.participantCount >= 2) setPanel(tr('connected'), 'connected');
   else setPanel(tr('waiting'), 'connected');
 }
@@ -283,8 +287,13 @@ function handleSocketMessage(event) {
     participantId = message.participantId || null;
     roomState = message.state || null;
     updatePresence(message.presence || {});
-    if (!roomState?.mediaId && currentMediaId) sendCurrentMedia();
-    else if (roomState) applyRoomState(roomState);
+    if (presence.participantCount <= 1 && currentMediaId) {
+      sendCurrentMedia();
+    } else if (!roomState?.mediaId && currentMediaId) {
+      sendCurrentMedia();
+    } else if (roomState) {
+      applyRoomState(roomState);
+    }
     return;
   }
 
