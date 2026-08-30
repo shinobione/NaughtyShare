@@ -5,15 +5,18 @@ const SYNC_INTERVAL_MS = 8000;
 const PING_INTERVAL_MS = 20000;
 const SOFT_DRIFT_SECONDS = 0.15;
 const HARD_DRIFT_SECONDS = 0.65;
+const RECONNECT_DELAYS_MS = [1000, 2000, 4000, 8000, 12000];
 
 const copy = {
   fr: {
     together: 'Regarder ensemble',
     leave: 'Quitter Together',
     connecting: 'Connexion à Together…',
+    reconnecting: 'Together · reconnexion…',
     waiting: 'Together · 1/2 · en attente de l’autre appareil',
     connected: 'Together · 2/2 connectés',
     synced: (drift) => `Synchronisés · dérive ${drift.toFixed(2)} s`,
+    catchingUp: 'L’autre appareil charge la vidéo…',
     different: 'L’autre appareil regarde un autre média.',
     join: 'Rejoindre',
     hiddenMedia: 'L’autre média est masqué par les filtres actuels.',
@@ -26,9 +29,11 @@ const copy = {
     together: 'Xem cùng nhau',
     leave: 'Rời Together',
     connecting: 'Đang kết nối Together…',
+    reconnecting: 'Together · đang kết nối lại…',
     waiting: 'Together · 1/2 · đang chờ thiết bị còn lại',
     connected: 'Together · 2/2 đã kết nối',
     synced: (drift) => `Đã đồng bộ · lệch ${drift.toFixed(2)} giây`,
+    catchingUp: 'Thiết bị kia đang tải video…',
     different: 'Thiết bị kia đang xem nội dung khác.',
     join: 'Xem cùng',
     hiddenMedia: 'Nội dung kia đang bị ẩn bởi bộ lọc hiện tại.',
@@ -42,7 +47,7 @@ const copy = {
 let socket = null;
 let participantId = null;
 let roomState = null;
-let presence = { participantCount: 0, sessionCount: 0, participants: [] };
+let presence = { participantCount: 0, sessionCount: 0, participants: [], bufferingParticipants: [] };
 let currentVideo = null;
 let currentMediaId = null;
 let pendingRemoteJoinId = null;
@@ -50,6 +55,8 @@ let remoteSwitchInProgress = false;
 let suppressLocalUntil = 0;
 let pingTimer = null;
 let syncTimer = null;
+let reconnectTimer = null;
+let reconnectAttempt = 0;
 let playbackRateResetTimer = null;
 let lastRttMs = 0;
 let lastPingAt = null;
@@ -92,11 +99,11 @@ function togetherButton() {
     button.innerHTML = '<span>♥</span><b></b>';
     actions.prepend(button);
     button.addEventListener('click', () => {
-      if (socket && socket.readyState <= WebSocket.OPEN) disconnectTogether();
+      if (desiredConnection) disconnectTogether();
       else connectTogether();
     });
   }
-  button.querySelector('b').textContent = socket && socket.readyState === WebSocket.OPEN ? tr('leave') : tr('together');
+  button.querySelector('b').textContent = desiredConnection ? tr('leave') : tr('together');
   button.dataset.state = socket && socket.readyState === WebSocket.OPEN ? 'connected' : 'idle';
   return button;
 }
@@ -142,9 +149,8 @@ function hidePanel() {
 function updateButton() {
   const button = togetherButton();
   if (!button) return;
-  const connected = socket && socket.readyState === WebSocket.OPEN;
-  button.querySelector('b').textContent = connected ? tr('leave') : tr('together');
-  button.dataset.state = connected ? 'connected' : 'idle';
+  button.querySelector('b').textContent = desiredConnection ? tr('leave') : tr('together');
+  button.dataset.state = socket && socket.readyState === WebSocket.OPEN ? 'connected' : 'idle';
 }
 
 function send(payload) {
@@ -183,6 +189,24 @@ function estimatedTargetPosition(state) {
   const base = Number(state?.position) || 0;
   if (!state?.playing) return Math.max(0, base);
   return Math.max(0, base + Math.max(0, lastRttMs) / 2000);
+}
+
+function partnerBuffering() {
+  return presence.bufferingParticipants.some((id) => id && id !== participantId);
+}
+
+function showPresenceStatus(drift = null) {
+  if (!desiredConnection) return;
+  if (presence.participantCount >= 2 && partnerBuffering()) {
+    setPanel(tr('catchingUp'), 'warning');
+    return;
+  }
+  if (presence.participantCount >= 2 && Number.isFinite(drift)) {
+    setPanel(tr('synced', Math.abs(drift)), 'synced');
+    return;
+  }
+  if (presence.participantCount >= 2) setPanel(tr('connected'), 'connected');
+  else setPanel(tr('waiting'), 'connected');
 }
 
 function cardForMedia(mediaId) {
@@ -272,8 +296,7 @@ async function applyRoomState(state, { force = false } = {}) {
     currentVideo.pause();
   }
 
-  if (presence.participantCount >= 2) setPanel(tr('synced', Math.abs(drift)), 'synced');
-  else setPanel(tr('waiting'), 'connected');
+  showPresenceStatus(drift);
 }
 
 function updatePresence(next) {
@@ -281,14 +304,14 @@ function updatePresence(next) {
     participantCount: Number(next?.participantCount) || 0,
     sessionCount: Number(next?.sessionCount) || 0,
     participants: Array.isArray(next?.participants) ? next.participants : [],
+    bufferingParticipants: Array.isArray(next?.bufferingParticipants) ? next.bufferingParticipants : [],
   };
   if (!desiredConnection) return;
   if (presence.participantCount >= 2 && roomState?.mediaId && currentMediaId && roomState.mediaId !== currentMediaId) {
     offerRemoteMedia(roomState.mediaId);
     return;
   }
-  if (presence.participantCount >= 2) setPanel(tr('connected'), 'connected');
-  else setPanel(tr('waiting'), 'connected');
+  showPresenceStatus();
 }
 
 function handleStateMessage(message) {
@@ -350,6 +373,11 @@ function stopTimers() {
   syncTimer = null;
 }
 
+function clearReconnectTimer() {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+}
+
 function startTimers() {
   stopTimers();
   pingTimer = window.setInterval(() => {
@@ -368,12 +396,32 @@ function websocketUrl() {
   return url.toString();
 }
 
-function connectTogether() {
-  if (!currentVideo || !currentMediaId) return;
-  if (socket && socket.readyState <= WebSocket.OPEN) return;
+function scheduleReconnect({ immediate = false } = {}) {
+  if (!desiredConnection || !currentVideo || !currentMediaId) return;
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+  clearReconnectTimer();
+  const index = Math.min(reconnectAttempt, RECONNECT_DELAYS_MS.length - 1);
+  const delay = immediate ? 0 : RECONNECT_DELAYS_MS[index];
+  reconnectAttempt += 1;
+  setPanel(tr('reconnecting'), 'connecting');
+  reconnectTimer = window.setTimeout(() => {
+    reconnectTimer = null;
+    connectTogether({ reconnect: true });
+  }, delay);
+}
 
-  desiredConnection = true;
-  setPanel(tr('connecting'), 'connecting');
+function connectTogether({ reconnect = false } = {}) {
+  if (!currentVideo || !currentMediaId) return;
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) return;
+
+  if (!reconnect) {
+    desiredConnection = true;
+    reconnectAttempt = 0;
+  }
+  if (!desiredConnection) return;
+
+  clearReconnectTimer();
+  setPanel(reconnect ? tr('reconnecting') : tr('connecting'), 'connecting');
   updateButton();
 
   let nextSocket;
@@ -381,12 +429,14 @@ function connectTogether() {
     nextSocket = new WebSocket(websocketUrl());
   } catch {
     setPanel(tr('socketError'), 'error');
-    desiredConnection = false;
+    scheduleReconnect();
     return;
   }
   socket = nextSocket;
 
   socket.addEventListener('open', () => {
+    reconnectAttempt = 0;
+    clearReconnectTimer();
     updateButton();
     setPanel(tr('waiting'), 'connected');
     startTimers();
@@ -400,15 +450,18 @@ function connectTogether() {
     socket = null;
     participantId = null;
     roomState = null;
-    presence = { participantCount: 0, sessionCount: 0, participants: [] };
+    presence = { participantCount: 0, sessionCount: 0, participants: [], bufferingParticipants: [] };
     updateButton();
-    if (desiredConnection) setPanel(tr('closed'), 'error');
+    if (desiredConnection && currentVideo && currentMediaId) scheduleReconnect();
+    else if (desiredConnection) setPanel(tr('closed'), 'error');
     else hidePanel();
   });
 }
 
 function disconnectTogether() {
   desiredConnection = false;
+  reconnectAttempt = 0;
+  clearReconnectTimer();
   stopTimers();
   if (playbackRateResetTimer) {
     clearTimeout(playbackRateResetTimer);
@@ -421,17 +474,28 @@ function disconnectTogether() {
   socket = null;
   participantId = null;
   roomState = null;
-  presence = { participantCount: 0, sessionCount: 0, participants: [] };
+  presence = { participantCount: 0, sessionCount: 0, participants: [], bufferingParticipants: [] };
   updateButton();
   hidePanel();
 }
 
+function setLocalBuffering(video, mediaId, buffering) {
+  const next = buffering ? '1' : '0';
+  if (video.dataset.togetherBuffering === next) return;
+  video.dataset.togetherBuffering = next;
+  if (socket?.readyState === WebSocket.OPEN) {
+    send({ type: 'BUFFER', mediaId, buffering });
+  }
+}
+
 function onLocalPlay(video, mediaId) {
+  setLocalBuffering(video, mediaId, false);
   if (localEventsSuppressed() || socket?.readyState !== WebSocket.OPEN) return;
   send({ type: 'PLAY', mediaId, position: video.currentTime || 0 });
 }
 
 function onLocalPause(video, mediaId) {
+  setLocalBuffering(video, mediaId, false);
   if (localEventsSuppressed() || socket?.readyState !== WebSocket.OPEN) return;
   send({ type: 'PAUSE', mediaId, position: video.currentTime || 0 });
 }
@@ -456,6 +520,11 @@ function wireVideo(video) {
     video.addEventListener('play', () => onLocalPlay(video, mediaId));
     video.addEventListener('pause', () => onLocalPause(video, mediaId));
     video.addEventListener('seeked', () => onLocalSeek(video, mediaId));
+    video.addEventListener('waiting', () => setLocalBuffering(video, mediaId, true));
+    video.addEventListener('stalled', () => setLocalBuffering(video, mediaId, true));
+    video.addEventListener('playing', () => setLocalBuffering(video, mediaId, false));
+    video.addEventListener('canplay', () => setLocalBuffering(video, mediaId, false));
+    video.addEventListener('ended', () => setLocalBuffering(video, mediaId, false));
   }
 
   if (!changed || socket?.readyState !== WebSocket.OPEN) return;
@@ -502,6 +571,12 @@ function init() {
   });
   languageObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
 
+  window.addEventListener('online', () => {
+    if (desiredConnection) scheduleReconnect({ immediate: true });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && desiredConnection) scheduleReconnect({ immediate: true });
+  });
   window.addEventListener('beforeunload', () => disconnectTogether(), { once: true });
 }
 
