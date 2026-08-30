@@ -8,13 +8,13 @@ Goal: make NaughtyShare video playback reliable on desktop, Android and iPhone b
 
 - [x] Strict authenticated HTTP byte-range delivery for `/media/:id`.
 - [x] iPhone authenticated blob fallback as a transport-vs-codec diagnostic.
-- [ ] Cloudflare Media Transformations Workers-binding proof of concept for one existing video.
-- [ ] Keep the original video unchanged in private R2; the compatibility MP4 is a private playback derivative only.
-- [ ] Store the optimized H.264/AAC MP4 under private R2 `app-data/`; never expose a permanent public media URL.
-- [ ] Serve the derivative through an authenticated NaughtyShare endpoint with strict GET/HEAD byte ranges.
-- [ ] First POC limited to a source smaller than 100 MB and a video no longer than 60 seconds, matching the current transformation output limit.
+- [x] Cloudflare Media Transformations Workers-binding proof of concept creates a private H.264/AAC derivative for a short existing video.
+- [x] Keep the original video unchanged in private R2; the compatibility MP4 is a private playback derivative only.
+- [x] Store the optimized H.264/AAC MP4 under private R2 `app-data/`; never expose a permanent public media URL.
+- [x] Serve the derivative through an authenticated NaughtyShare endpoint with strict GET/HEAD byte ranges.
+- [x] First POC limited to a source smaller than 100 MB and a video no longer than 60 seconds, matching the current transformation output limit.
 - [ ] Production smoke on Trân's iPhone: open, play, seek, close/reopen.
-- [ ] Confirm deletion cleanup so deleting the NaughtyShare original also deletes its compatibility derivative.
+- [x] Confirm deletion cleanup so deleting the NaughtyShare original also deletes its compatibility derivative.
 - [ ] Decide derivative policy after the smoke: opt-in, automatic for compatible new videos, or background preparation.
 - [ ] If universal playback needs videos beyond the Media Transformations limits, re-evaluate paid Cloudflare Stream or another long-form transcoding path.
 - [ ] Retire the temporary iOS blob fallback after universal playback is proven.
@@ -23,22 +23,30 @@ Goal: make NaughtyShare video playback reliable on desktop, Android and iPhone b
 
 The Media Transformations binding is deliberately isolated above the existing v1-compatible Worker. The R2 binding remains `env.MEDIA`; the transformation binding uses a separate `env.VIDEO_TRANSFORM` name so the private bucket binding is never shadowed. No Stream subscription, Stream video library, new API key or new D1 migration is required for this POC.
 
-## Phase 6 — NaughtyShare Together — PLANNED
+## Phase 6 — NaughtyShare Together — FOUNDATION IN PROGRESS
 
 Goal: turn the private gallery into a two-person synchronized watch room without sending the watched media through the call connection.
 
+The Together foundation is developed as a stacked branch/PR above the Universal Playback POC. It may compile and be reviewed before the iPhone smoke, but it must not replace the current production runtime until Universal Playback passes on Trân's iPhone.
+
 ### Together Rooms
 
-- [ ] `Regarder ensemble / Xem cùng nhau` entry point from the viewer.
-- [ ] One Cloudflare Durable Object per active room.
-- [ ] Authenticated WebSocket presence for the two allowed NaughtyShare users only.
-- [ ] Authoritative room state: media ID, play/pause, target position, update timestamp and controller mode.
-- [ ] Synchronize PLAY / PAUSE / SEEK / NEXT / PREVIOUS.
-- [ ] Timestamp-aware sync so France/Vietnam latency does not shift playback start.
-- [ ] Drift correction: ignore tiny drift, temporary playback-rate correction for small drift, seek for large drift.
+- [x] `Regarder ensemble / Xem cùng nhau` entry point from the video viewer.
+- [x] One Cloudflare Durable Object for the private shared room, using SQLite-backed Durable Object storage.
+- [x] Authenticated same-origin WebSocket route, gated through the existing NaughtyShare Access/JWT chain before the Durable Object is reached.
+- [x] WebSocket Hibernation API with serialized session identity and low-cost raw `ping`/`pong` support.
+- [x] Presence based on unique authenticated participants (`1/2`, `2/2`) without exposing email addresses to the browser room protocol.
+- [x] Authoritative room state: media ID, play/pause, target position, update timestamp, revision and shared controller mode.
+- [x] Synchronize PLAY / PAUSE / SEEK for the currently viewed video.
+- [x] Periodic state resync plus RTT estimation for France/Vietnam latency.
+- [x] Drift correction foundation: ignore tiny drift, temporary `0.98/1.02` playback-rate correction for small drift, hard seek for larger drift.
+- [x] Detect when the partner is on another media item and offer a local `Rejoindre / Xem cùng` action when that item is available in the rendered gallery.
+- [ ] Synchronize NEXT / PREVIOUS as explicit room commands rather than relying on each device's local gallery sort/filter state.
 - [ ] Buffer awareness and a clear `partner is catching up` state.
 - [ ] Controller modes: Jerry controls / Trân controls / shared control.
-- [ ] Room resume after a temporary network disconnect.
+- [ ] Automatic reconnect and room resume after a temporary network disconnect or PWA resume.
+- [ ] Invite/attention mechanism so the second participant does not need to discover the room manually.
+- [ ] Production smoke with both authenticated devices after Universal Playback is validated.
 
 ### NaughtyCall
 
@@ -61,4 +69,4 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 
 ## Ordering rule
 
-Do not start Together synchronization on top of an unreliable video player. Universal playback must pass on the iPhone first; then implement room synchronization; then add the call layer; then add cosmetic/reaction polish.
+Universal Playback must pass on the iPhone before a Together branch is allowed to become the production runtime. Development and CI for the room foundation can proceed in parallel; production activation remains gated. After room synchronization is stable, add the call layer, then reactions and cosmetic polish.
