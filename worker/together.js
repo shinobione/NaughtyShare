@@ -216,10 +216,12 @@ export class TogetherRoom extends DurableObject {
     };
   }
 
-  presence() {
-    const sockets = this.ctx.getWebSockets();
+  presence(excludeSocket = null) {
     const participantIds = [];
-    for (const socket of sockets) {
+    let sessionCount = 0;
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket === excludeSocket || socket.readyState !== 1) continue;
+      sessionCount += 1;
       const attachment = socket.deserializeAttachment();
       if (attachment?.participantId && !participantIds.includes(attachment.participantId)) {
         participantIds.push(attachment.participantId);
@@ -228,7 +230,7 @@ export class TogetherRoom extends DurableObject {
     return {
       participants: participantIds,
       participantCount: participantIds.length,
-      sessionCount: sockets.length,
+      sessionCount,
     };
   }
 
@@ -248,12 +250,12 @@ export class TogetherRoom extends DurableObject {
     }
   }
 
-  broadcastPresence() {
+  broadcastPresence(excludeSocket = null) {
     this.broadcast({
       type: 'PRESENCE',
-      ...this.presence(),
+      ...this.presence(excludeSocket),
       serverTimeMs: Date.now(),
-    });
+    }, excludeSocket);
   }
 
   async persistState() {
@@ -385,21 +387,16 @@ export class TogetherRoom extends DurableObject {
   }
 
   async webSocketClose(socket) {
-    try {
-      socket.close();
-    } catch {
-      // The close handshake may already be complete.
-    }
-    this.broadcastPresence();
+    this.broadcastPresence(socket);
   }
 
   async webSocketError(socket) {
+    this.broadcastPresence(socket);
     try {
       socket.close(1011, 'Together socket error');
     } catch {
       // Ignore teardown errors.
     }
-    this.broadcastPresence();
   }
 }
 
