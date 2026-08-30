@@ -162,6 +162,7 @@ function normalizeStoredState(value) {
 export class TogetherRoom extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
+    this.env = env;
     this.roomState = defaultRoomState();
     this.ready = this.ctx.blockConcurrencyWhile(async () => {
       this.roomState = normalizeStoredState(await this.ctx.storage.get(ROOM_STATE_KEY));
@@ -262,6 +263,16 @@ export class TogetherRoom extends DurableObject {
     await this.ctx.storage.put(ROOM_STATE_KEY, this.roomState);
   }
 
+  async videoExists(mediaId) {
+    const row = await this.env.DB.prepare(
+      `SELECT id, content_type
+       FROM media
+       WHERE id = ?1
+       LIMIT 1`,
+    ).bind(mediaId).first();
+    return Boolean(row?.id && String(row.content_type || '').startsWith('video/'));
+  }
+
   async commitState(actor, reason, patch) {
     const now = Date.now();
     const currentPosition = this.projectedPosition(now);
@@ -340,6 +351,10 @@ export class TogetherRoom extends DurableObject {
         mediaId = safeMediaId(data?.mediaId);
       } catch {
         this.sendError(socket, 'BAD_MEDIA', 'Invalid media identifier');
+        return;
+      }
+      if (!(await this.videoExists(mediaId))) {
+        this.sendError(socket, 'MEDIA_NOT_FOUND', 'Together media is missing or is not a video');
         return;
       }
       await this.commitState(actor, 'media', {
