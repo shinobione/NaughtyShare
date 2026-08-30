@@ -1,0 +1,102 @@
+.viewer-action.together-action {
+  border-color: rgba(255, 101, 180, 0.42);
+  background: linear-gradient(135deg, rgba(255, 78, 154, 0.16), rgba(150, 90, 255, 0.13));
+}
+
+.viewer-action.together-action[data-state='connected'] {
+  border-color: rgba(255, 101, 180, 0.8);
+  box-shadow: 0 0 0 1px rgba(255, 101, 180, 0.12), 0 0 24px rgba(255, 78, 154, 0.12);
+}
+
+.together-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: min(92%, 44rem);
+  min-height: 2.4rem;
+  padding: 0.58rem 0.76rem;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  background: rgba(10, 10, 16, 0.92);
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.36);
+  color: #fff;
+  font-size: 0.78rem;
+  line-height: 1.25;
+  backdrop-filter: blur(14px);
+}
+
+.together-panel[hidden] {
+  display: none !important;
+}
+
+.together-dot {
+  width: 0.52rem;
+  height: 0.52rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #777;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+}
+
+.together-panel[data-state='connecting'] .together-dot {
+  animation: together-pulse 1.1s ease-in-out infinite;
+}
+
+.together-panel[data-state='connected'] .together-dot,
+.together-panel[data-state='synced'] .together-dot {
+  background: #ff65b4;
+  box-shadow: 0 0 0 3px rgba(255, 101, 180, 0.14), 0 0 16px rgba(255, 101, 180, 0.55);
+}
+
+.together-panel[data-state='warning'] .together-dot {
+  background: #f6bc62;
+}
+
+.together-panel[data-state='error'] .together-dot {
+  background: #ff6c78;
+}
+
+.together-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.together-join {
+  flex: 0 0 auto;
+  padding: 0.32rem 0.6rem;
+  border: 1px solid rgba(255, 101, 180, 0.5);
+  border-radius: 999px;
+  background: rgba(255, 101, 180, 0.12);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.together-join:active {
+  transform: translateY(1px);
+}
+
+@keyframes together-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.82); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 720px) {
+  .together-panel {
+    bottom: 0.72rem;
+    max-width: calc(100% - 1rem);
+    font-size: 0.74rem;
+  }
+
+  .viewer-action.together-action b {
+    display: none;
+  }
+}
