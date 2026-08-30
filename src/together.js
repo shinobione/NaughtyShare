@@ -46,6 +46,7 @@ let presence = { participantCount: 0, sessionCount: 0, participants: [] };
 let currentVideo = null;
 let currentMediaId = null;
 let pendingRemoteJoinId = null;
+let remoteSwitchInProgress = false;
 let suppressLocalUntil = 0;
 let pingTimer = null;
 let syncTimer = null;
@@ -79,6 +80,10 @@ function togetherButton() {
   const actions = document.querySelector('.viewer-actions');
   if (!actions) return null;
   let button = actions.querySelector('#viewer-together');
+  if (!currentVideo || !currentMediaId) {
+    button?.remove();
+    return null;
+  }
   if (!button) {
     button = document.createElement('button');
     button.type = 'button';
@@ -182,7 +187,34 @@ function estimatedTargetPosition(state) {
 
 function cardForMedia(mediaId) {
   const escaped = globalThis.CSS?.escape ? CSS.escape(mediaId) : mediaId.replace(/[^A-Za-z0-9_-]/g, '');
-  return document.querySelector(`.media-card[data-media-id="${escaped}"] .media-open`);
+  const button = document.querySelector(`.media-card[data-media-id="${escaped}"] .media-open`);
+  const card = button?.closest('.media-card');
+  if (!button || card?.hidden) return null;
+  if (card && getComputedStyle(card).display === 'none') return null;
+  return button;
+}
+
+function openRemoteMedia(card, mediaId) {
+  pendingRemoteJoinId = mediaId;
+  const dialog = document.querySelector('#media-dialog');
+
+  const openCard = () => {
+    card.click();
+    remoteSwitchInProgress = false;
+    window.setTimeout(() => {
+      const video = document.querySelector('.viewer-stage video.viewer-media');
+      if (video) wireVideo(video);
+      if (roomState) applyRoomState(roomState, { force: true });
+    }, 0);
+  };
+
+  if (dialog?.open) {
+    remoteSwitchInProgress = true;
+    dialog.close();
+    window.requestAnimationFrame(openCard);
+  } else {
+    openCard();
+  }
 }
 
 function offerRemoteMedia(mediaId) {
@@ -193,15 +225,7 @@ function offerRemoteMedia(mediaId) {
   }
   setPanel(tr('different'), 'warning', {
     label: tr('join'),
-    run: () => {
-      pendingRemoteJoinId = mediaId;
-      card.click();
-      window.setTimeout(() => {
-        const video = document.querySelector('.viewer-stage video.viewer-media');
-        if (video) wireVideo(video);
-        if (roomState) applyRoomState(roomState, { force: true });
-      }, 0);
-    },
+    run: () => openRemoteMedia(card, mediaId),
   });
 }
 
@@ -287,7 +311,7 @@ function handleSocketMessage(event) {
     participantId = message.participantId || null;
     roomState = message.state || null;
     updatePresence(message.presence || {});
-    if (presence.participantCount <= 1 && currentMediaId) {
+    if (presence.sessionCount <= 1 && currentMediaId) {
       sendCurrentMedia();
     } else if (!roomState?.mediaId && currentMediaId) {
       sendCurrentMedia();
@@ -386,6 +410,11 @@ function connectTogether() {
 function disconnectTogether() {
   desiredConnection = false;
   stopTimers();
+  if (playbackRateResetTimer) {
+    clearTimeout(playbackRateResetTimer);
+    playbackRateResetTimer = null;
+  }
+  if (currentVideo && Math.abs(currentVideo.playbackRate - 1) > 0.001) currentVideo.playbackRate = 1;
   if (socket) {
     try { socket.close(1000, 'User left Together'); } catch { /* no-op */ }
   }
@@ -458,7 +487,10 @@ function scanViewer() {
 function init() {
   scanViewer();
   const dialog = document.querySelector('#media-dialog');
-  dialog?.addEventListener('close', () => disconnectTogether());
+  dialog?.addEventListener('close', () => {
+    if (remoteSwitchInProgress) return;
+    disconnectTogether();
+  });
 
   const observer = new MutationObserver(scanViewer);
   const root = document.querySelector('#app') || document.body;
