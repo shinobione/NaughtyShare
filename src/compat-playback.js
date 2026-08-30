@@ -1,4 +1,5 @@
 const MAX_COMPAT_SECONDS = 60;
+const compatObjectUrls = new Map();
 
 function isAppleMobileWebKit() {
   const ua = navigator.userAgent || '';
@@ -19,11 +20,13 @@ function copy() {
         none: 'Chưa có bản tương thích iPhone.',
         converting: 'Cloudflare đang tạo bản MP4 H.264 riêng tư…',
         ready: 'Bản iPhone đã sẵn sàng.',
+        loadingCompat: 'Đang tải bản MP4 H.264 bảo mật cho iPhone…',
         active: 'Đang phát bản MP4 H.264 tương thích iPhone.',
         tooLong: 'POC hiện chỉ hỗ trợ video tối đa 60 giây.',
         durationUnknown: 'Không thể xác định thời lượng video.',
         tooLarge: 'POC hiện yêu cầu video nguồn nhỏ hơn 100 MB.',
         failed: 'Không thể chuẩn bị bản iPhone.',
+        playbackFailed: 'Không thể tải bản iPhone để phát.',
       }
     : {
         prepare: 'Préparer pour iPhone',
@@ -31,11 +34,13 @@ function copy() {
         none: 'Version iPhone non préparée.',
         converting: 'Cloudflare crée le MP4 H.264 privé…',
         ready: 'Version iPhone prête.',
+        loadingCompat: 'Chargement sécurisé du MP4 H.264 iPhone…',
         active: 'Lecture du MP4 H.264 compatible iPhone.',
         tooLong: 'Le POC est limité aux vidéos de 60 secondes maximum.',
         durationUnknown: 'Impossible de déterminer la durée de cette vidéo.',
         tooLarge: 'Le POC exige actuellement une vidéo source de moins de 100 Mo.',
         failed: 'Impossible de préparer la version iPhone.',
+        playbackFailed: 'Impossible de charger la version iPhone pour la lecture.',
       };
 }
 
@@ -99,9 +104,23 @@ function ensureButton() {
   return button;
 }
 
+function releaseCompatObjectUrl(video) {
+  const url = compatObjectUrls.get(video);
+  if (!url) return;
+  URL.revokeObjectURL(url);
+  compatObjectUrls.delete(video);
+}
+
+function cleanupDetachedCompatUrls() {
+  for (const [video] of compatObjectUrls) {
+    if (!video.isConnected) releaseCompatObjectUrl(video);
+  }
+}
+
 function clearUi() {
   document.querySelector('#viewer-compat-video')?.remove();
   document.querySelector('.compat-video-status')?.remove();
+  cleanupDetachedCompatUrls();
 }
 
 async function requestJson(path, options = {}) {
@@ -118,26 +137,77 @@ async function requestJson(path, options = {}) {
   return { response, data };
 }
 
-function activateCompatPlayback(video, url) {
-  if (!video || !url || video.dataset.compatPlayback === 'active') return;
-  const resumeAt = Number.isFinite(video.currentTime) ? video.currentTime : 0;
-  video.dataset.compatPlayback = 'active';
-  video.dataset.compatState = 'active';
-  video.dataset.compatOriginalSrc = video.getAttribute('src') || '';
-  video.pause();
-  video.src = url;
-  video.load();
-  if (resumeAt > 0) {
-    video.addEventListener('loadedmetadata', () => {
-      try {
-        video.currentTime = Math.min(resumeAt, Math.max(0, (video.duration || resumeAt) - 0.1));
-      } catch {
-        // Resume is best-effort.
-      }
-    }, { once: true });
-  }
+async function activateCompatPlayback(video, url) {
+  if (!video || !url || video.dataset.compatPlayback === 'active' || video.dataset.compatPlayback === 'loading') return;
+  const text = copy();
   const status = viewerStatus();
-  if (status) status.textContent = copy().active;
+  const resumeAt = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+  video.dataset.compatPlayback = 'loading';
+  video.dataset.compatState = 'loading-playback';
+  if (status) status.textContent = text.loadingCompat;
+
+  try {
+    // Do not hand the authenticated URL directly to <video> on iOS. Safari's
+    // native media loader can lose the Cloudflare Access session on media/range
+    // subrequests. Fetch the already-transcoded H.264 derivative in the normal
+    // authenticated page context, then give the player a local blob URL.
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { Accept: 'video/mp4,video/*;q=0.9,*/*;q=0.8' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    });
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    if (!response.ok || !contentType.startsWith('video/')) {
+      throw new Error(`HTTP ${response.status} ${contentType || 'unknown-type'}`);
+    }
+
+    const blob = await response.blob();
+    if (!blob.size || !blob.type.startsWith('video/')) throw new Error('invalid-video-blob');
+
+    releaseCompatObjectUrl(video);
+    const blobUrl = URL.createObjectURL(blob);
+    compatObjectUrls.set(video, blobUrl);
+    video.dataset.compatOriginalSrc = video.getAttribute('src') || '';
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    video.src = blobUrl;
+    video.dataset.compatPlayback = 'active';
+    video.dataset.compatState = 'active';
+
+    let settled = false;
+    const onPlayable = () => {
+      if (settled) return;
+      settled = true;
+      if (resumeAt > 0) {
+        try {
+          video.currentTime = Math.min(resumeAt, Math.max(0, (video.duration || resumeAt) - 0.1));
+        } catch {
+          // Resume is best-effort.
+        }
+      }
+      if (status) status.textContent = text.active;
+    };
+    const onError = () => {
+      if (settled) return;
+      settled = true;
+      const code = Number(video.error?.code || 0);
+      video.dataset.compatPlayback = 'failed';
+      video.dataset.compatState = 'error';
+      if (status) status.textContent = `${text.playbackFailed} · media-error ${code || '?'} · blob-decode-failed`;
+      releaseCompatObjectUrl(video);
+    };
+    video.addEventListener('canplay', onPlayable, { once: true });
+    video.addEventListener('loadeddata', onPlayable, { once: true });
+    video.addEventListener('error', onError, { once: true });
+    video.load();
+  } catch (error) {
+    video.dataset.compatPlayback = 'failed';
+    video.dataset.compatState = 'error';
+    if (status) status.textContent = `${text.playbackFailed} · ${error?.message || 'fetch failed'}`;
+    releaseCompatObjectUrl(video);
+  }
 }
 
 async function checkDerivative(video, mediaId) {
@@ -157,7 +227,7 @@ async function checkDerivative(video, mediaId) {
   if (data.state === 'ready' && data.url) {
     video.dataset.compatState = 'ready';
     if (status) status.textContent = copy().ready;
-    if (isAppleMobileWebKit()) activateCompatPlayback(video, data.url);
+    if (isAppleMobileWebKit()) await activateCompatPlayback(video, data.url);
   }
   return data;
 }
@@ -202,7 +272,7 @@ async function prepareDerivative(video, mediaId, button) {
 
     video.dataset.compatState = 'ready';
     if (status) status.textContent = text.ready;
-    if (isAppleMobileWebKit() && data.url) activateCompatPlayback(video, data.url);
+    if (isAppleMobileWebKit() && data.url) await activateCompatPlayback(video, data.url);
   } catch (error) {
     video.dataset.compatState = 'error';
     if (status) status.textContent = `${text.failed} · ${error?.message || 'unknown error'}`;
@@ -226,6 +296,7 @@ async function wireVideo(video) {
 }
 
 function scanViewer() {
+  cleanupDetachedCompatUrls();
   const stage = document.querySelector('.viewer-stage');
   if (!stage) return;
   const video = stage.querySelector('video.viewer-media');
@@ -251,6 +322,9 @@ function init() {
   }
   const languageObserver = new MutationObserver(scanViewer);
   languageObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+  window.addEventListener('beforeunload', () => {
+    for (const [video] of compatObjectUrls) releaseCompatObjectUrl(video);
+  }, { once: true });
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
