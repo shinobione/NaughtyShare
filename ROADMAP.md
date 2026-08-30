@@ -42,9 +42,10 @@ The Together foundation is developed as a stacked branch/PR above the Universal 
 - [x] Drift correction foundation: ignore tiny drift, temporary `0.98/1.02` playback-rate correction for small drift, hard seek for larger drift.
 - [x] Detect when the partner is on another media item and offer a local `Rejoindre / Xem cùng` action when that item is available in the rendered gallery.
 - [ ] Synchronize NEXT / PREVIOUS as explicit room commands rather than relying on each device's local gallery sort/filter state.
-- [ ] Buffer awareness and a clear `partner is catching up` state.
+- [x] Buffer awareness with per-participant transient state and a clear `partner is catching up` message; no forced global pause yet.
 - [ ] Controller modes: Jerry controls / Trân controls / shared control.
-- [ ] Automatic reconnect and room resume after a temporary network disconnect or PWA resume.
+- [x] Automatic WebSocket reconnect with bounded backoff after a temporary network disconnect, plus immediate reconnect attempts on network return and PWA/tab resume.
+- [ ] Persist explicit room intent across a fully killed/relaunched PWA session.
 - [ ] Invite/attention mechanism so the second participant does not need to discover the room manually.
 - [ ] Production smoke with both authenticated devices after Universal Playback is validated.
 
