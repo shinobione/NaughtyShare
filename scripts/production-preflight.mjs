@@ -37,6 +37,23 @@ async function validateTogetherWrapper() {
   requireMatch(/"exports"\s*:\s*\{[\s\S]*?"TogetherRoom"\s*:\s*\{[\s\S]*?"type"\s*:\s*"durable-object"[\s\S]*?"storage"\s*:\s*"sqlite"/, 'TogetherRoom must use declarative SQLite Durable Object storage');
 }
 
+async function validateTogetherInviteWrapper() {
+  const wrapper = await readFile(new URL('../worker/together-invite.js', import.meta.url), 'utf8');
+  const markers = [
+    [/import\s+togetherWorker,\s*\{\s*TogetherRoom\s*\}\s+from\s+['"]\.\/together\.js['"]/, 'Invite wrapper must import and re-export TogetherRoom from worker/together.js'],
+    [/export\s+class\s+TogetherInviteRoom\s+extends\s+DurableObject/, 'TogetherInviteRoom must be exported as a Durable Object class'],
+    [/async\s+function\s+authenticateViaTogether\s*\(/, 'Invite WebSocket route must reuse the authenticated Together/media/v1 chain'],
+    [/url\.pathname\s*===\s*['"]\/api\/together\/invite\/ws['"]/, 'Invite wrapper must expose only the authenticated Together invite WebSocket endpoint'],
+    [/return\s+togetherWorker\.fetch\(request,\s*env,\s*ctx\)\s*;/, 'Invite wrapper must delegate unmatched requests to Together'],
+  ];
+  for (const [pattern, message] of markers) {
+    if (!pattern.test(wrapper)) failures.push(message);
+  }
+
+  requireMatch(/"name"\s*:\s*"TOGETHER_INVITES"[\s\S]*?"class_name"\s*:\s*"TogetherInviteRoom"/, 'TOGETHER_INVITES Durable Object binding is required');
+  requireMatch(/"TogetherInviteRoom"\s*:\s*\{[\s\S]*?"type"\s*:\s*"durable-object"[\s\S]*?"storage"\s*:\s*"sqlite"/, 'TogetherInviteRoom must use declarative SQLite Durable Object storage');
+}
+
 requireMatch(/"preview_urls"\s*:\s*false/, 'preview_urls must be explicitly false');
 requireMatch(/"run_worker_first"\s*:\s*true/, 'assets.run_worker_first must be true so authentication gates the PWA shell');
 
@@ -50,6 +67,10 @@ if (!workerEntry) {
 } else if (workerEntry === 'worker/together.js') {
   await validateMediaPocWrapper();
   await validateTogetherWrapper();
+} else if (workerEntry === 'worker/together-invite.js') {
+  await validateMediaPocWrapper();
+  await validateTogetherWrapper();
+  await validateTogetherInviteWrapper();
 } else {
   failures.push(`worker entry ${workerEntry} is not an approved production entrypoint`);
 }
