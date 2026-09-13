@@ -21,11 +21,11 @@ Goal: improve cross-device video compatibility without blocking the core couple 
 
 The iPhone issue is useful to solve but is **not a blocker for Together**. Trân may use Windows as her primary NaughtyShare device, so the first Together production target is Windows/desktop ↔ Windows/desktop. iPhone compatibility continues in parallel.
 
-## Phase 6 — NaughtyShare Together — PRODUCTION SMOKE IN PROGRESS
+## Phase 6 — NaughtyShare Together — WINDOWS PRODUCTION SMOKE VALIDATED
 
 Goal: turn the private gallery into a two-person synchronized watch room without sending the watched media through the later call connection.
 
-### Together Rooms — foundation implemented
+### Together Rooms — production foundation validated
 
 - [x] `Regarder ensemble / Xem cùng nhau` entry point from the video viewer.
 - [x] One Cloudflare Durable Object for the private shared room, using SQLite-backed Durable Object storage.
@@ -43,7 +43,7 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 - [x] Production single-device smoke: ordinary video open/play/close stable after hotfix #34; Together joins successfully at `1/2`.
 - [x] In-app Together invite/attention foundation: lightweight authenticated lobby socket, persistent short-lived invite, FR/VN popup, accept/decline, automatic opening of the invited video and automatic Together join.
 - [x] Production two-device connection smoke: Jerry Windows ↔ Trân Windows reached `2/2` in production through the invite flow.
-- [ ] Production playback-sync smoke: bidirectional play → pause → seek, then leave/rejoin and reconnect cleanup.
+- [x] Production playback-sync smoke: bidirectional play → pause → seek works correctly, including leave/rejoin and presence cleanup.
 - [ ] Synchronize NEXT / PREVIOUS as explicit room commands rather than relying on each device's local gallery sort/filter state.
 - [ ] Controller modes: Jerry controls / Trân controls / shared control.
 - [ ] Persist explicit Together intent across a fully killed/relaunched PWA session.
@@ -56,11 +56,11 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 3. [x] Trân receives the Together popup and clicks `Tham gia`.
 4. [x] NaughtyShare opens the invited video automatically on Trân's device and joins Together automatically.
 5. [x] Confirm `2/2` presence on both devices.
-6. [ ] Jerry tests play → pause → seek; Trân follows.
-7. [ ] Trân tests play → pause → seek; Jerry follows.
-8. [ ] Leave/rejoin once and confirm presence cleanup + reconnect.
+6. [x] Jerry tests play → pause → seek; Trân follows.
+7. [x] Trân tests play → pause → seek; Jerry follows.
+8. [x] Leave/rejoin once and confirm presence cleanup + reconnect.
 
-## Phase 7 — NaughtyCall — AFTER TOGETHER SMOKE
+## Phase 7 — NaughtyCall — NEXT MAJOR SLICE
 
 - [ ] Separate WebRTC audio/video call from the watched media stream.
 - [ ] Cloudflare Realtime/SFU integration for microphone and camera.
@@ -81,4 +81,4 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 
 ## Ordering rule
 
-**Together playback-sync smoke → NaughtyCall → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
+**NaughtyCall → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
