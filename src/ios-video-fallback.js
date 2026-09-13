@@ -1,5 +1,5 @@
 const FALLBACK_ATTR = 'data-ios-video-fallback';
-const objectUrls = new Set();
+const objectUrls = new Map();
 
 function isAppleMobileWebKit() {
   const ua = navigator.userAgent || '';
@@ -64,8 +64,46 @@ function mediaErrorCode(video) {
   return Number(video.error?.code || 0);
 }
 
+function releaseObjectUrl(video) {
+  const url = objectUrls.get(video);
+  if (!url) return;
+  URL.revokeObjectURL(url);
+  objectUrls.delete(video);
+}
+
+function cleanupDetachedObjectUrls() {
+  for (const [video] of objectUrls) {
+    if (!video.isConnected) releaseObjectUrl(video);
+  }
+}
+
+function compatibilityCheckPending(video) {
+  return video.dataset.compatState === 'checking' || video.dataset.compatState === 'converting';
+}
+
 async function activateBlobFallback(video) {
-  if (!video || video.getAttribute(FALLBACK_ATTR) === 'loading' || video.getAttribute(FALLBACK_ATTR) === 'active') return;
+  if (!video || video.getAttribute(FALLBACK_ATTR) === 'loading') return;
+
+  if (compatibilityCheckPending(video)) {
+    window.setTimeout(() => {
+      if (video.isConnected) activateBlobFallback(video);
+    }, 900);
+    return;
+  }
+
+  if (video.getAttribute(FALLBACK_ATTR) === 'active') {
+    const text = copy();
+    const status = ensureStatus(video);
+    const code = mediaErrorCode(video);
+    video.setAttribute(FALLBACK_ATTR, 'failed');
+    if (status) {
+      status.textContent = `${text.failed} · ${text.detail} ${code || '?'} · blob-decode-failed`;
+      status.dataset.videoDiagnostic = '1';
+    }
+    releaseObjectUrl(video);
+    return;
+  }
+
   const source = video.currentSrc || video.src;
   if (!source || source.startsWith('blob:')) return;
 
@@ -91,8 +129,9 @@ async function activateBlobFallback(video) {
     const blob = await response.blob();
     if (!blob.size || !blob.type.startsWith('video/')) throw new Error('invalid-video-blob');
 
+    releaseObjectUrl(video);
     const blobUrl = URL.createObjectURL(blob);
-    objectUrls.add(blobUrl);
+    objectUrls.set(video, blobUrl);
     video.pause();
     video.removeAttribute('src');
     video.load();
@@ -124,7 +163,6 @@ function wireViewerVideo(video) {
   video.dataset.iosFallbackWired = '1';
 
   video.addEventListener('error', () => {
-    if (video.getAttribute(FALLBACK_ATTR) === 'active') return;
     activateBlobFallback(video);
   });
 
@@ -138,6 +176,7 @@ function wireViewerVideo(video) {
 }
 
 function scanViewer() {
+  cleanupDetachedObjectUrls();
   document.querySelectorAll('.viewer-stage video.viewer-media').forEach(wireViewerVideo);
 }
 
@@ -150,8 +189,7 @@ function init() {
     observer.observe(stage, { childList: true, subtree: true });
   }
   window.addEventListener('beforeunload', () => {
-    for (const url of objectUrls) URL.revokeObjectURL(url);
-    objectUrls.clear();
+    for (const [video] of objectUrls) releaseObjectUrl(video);
   }, { once: true });
 }
 

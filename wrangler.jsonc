@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "naughtyshare",
-  "main": "worker/v1.js",
+  "main": "worker/media-poc.js",
   "compatibility_date": "2026-08-18",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
@@ -32,6 +32,9 @@
       "database_id": "17deaee9-75e4-4852-bad5-d13bbcc59390"
     }
   ],
+  "media": {
+    "binding": "VIDEO_TRANSFORM"
+  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1
