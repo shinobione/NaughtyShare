@@ -198,8 +198,13 @@ function prepareViewerVideo() {
     return;
   }
 
-  if (video.controlsList?.add) video.controlsList.add('nofullscreen');
-  video.setAttribute('controlsList', `${video.getAttribute('controlsList') || ''} nofullscreen`.trim());
+  if (video.controlsList?.add) {
+    if (!video.controlsList.contains('nofullscreen')) video.controlsList.add('nofullscreen');
+  } else {
+    const tokens = new Set((video.getAttribute('controlsList') || '').split(/\s+/).filter(Boolean));
+    tokens.add('nofullscreen');
+    video.setAttribute('controlsList', Array.from(tokens).join(' '));
+  }
   if (button) button.hidden = false;
 }
 
