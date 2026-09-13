@@ -39,6 +39,7 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 - [x] Detect when the partner is on another media item and offer `Rejoindre / Xem cùng` when that item is visible locally.
 - [x] Buffer awareness with per-participant transient state and a clear partner-catching-up state.
 - [x] Automatic WebSocket reconnect with bounded backoff after a temporary network disconnect, plus immediate reconnect attempts on network return and tab/PWA resume.
+- [ ] **Access prerequisite:** replace Worker-level Access protection with a hostname-based self-hosted Access application for `naughtyshare.jerryquinet.workers.dev` before the WebSocket production smoke. Cloudflare Worker-level Access currently rejects WebSocket upgrades with `403`.
 - [ ] Production smoke: Jerry Windows ↔ Trân Windows.
 - [ ] Synchronize NEXT / PREVIOUS as explicit room commands rather than relying on each device's local gallery sort/filter state.
 - [ ] Controller modes: Jerry controls / Trân controls / shared control.
@@ -47,6 +48,7 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 
 ### First production smoke
 
+0. Move Access protection from Worker-level to hostname-based self-hosted Access while preserving the same Google identity provider and exact allowlist.
 1. Both users authenticate normally on Windows.
 2. Open the same video on both devices.
 3. Both join Together and confirm `2/2` presence.
@@ -75,4 +77,4 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 
 ## Ordering rule
 
-**Together Rooms Windows smoke → NaughtyCall → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
+**Hostname-based Access prerequisite → Together Rooms Windows smoke → NaughtyCall → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
