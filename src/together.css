@@ -84,6 +84,89 @@
   transform: translateY(1px);
 }
 
+.together-invite-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(3, 3, 8, 0.78);
+  backdrop-filter: blur(12px);
+}
+
+.together-invite-overlay[hidden] {
+  display: none !important;
+}
+
+.together-invite-card {
+  width: min(92vw, 28rem);
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 101, 180, 0.38);
+  border-radius: 1.4rem;
+  background: linear-gradient(180deg, rgba(28, 17, 29, 0.98), rgba(11, 11, 17, 0.98));
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55), 0 0 45px rgba(255, 78, 154, 0.12);
+  color: #fff;
+  text-align: center;
+}
+
+.together-invite-heart {
+  display: grid;
+  place-items: center;
+  width: 3.6rem;
+  height: 3.6rem;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 78, 154, 0.32), rgba(150, 90, 255, 0.26));
+  color: #ff79bd;
+  font-size: 1.65rem;
+  box-shadow: 0 0 30px rgba(255, 78, 154, 0.18);
+}
+
+.together-invite-card h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 4vw, 1.75rem);
+}
+
+.together-invite-card p {
+  margin: 0.75rem auto 1.25rem;
+  max-width: 23rem;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.5;
+}
+
+.together-invite-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 0.7rem;
+}
+
+.together-invite-actions button {
+  min-height: 3rem;
+  border-radius: 0.9rem;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.together-invite-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.together-invite-primary {
+  border: 1px solid rgba(255, 101, 180, 0.58);
+  background: linear-gradient(135deg, #ef4f98, #8a5cf5);
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(239, 79, 152, 0.2);
+}
+
+.together-invite-actions button:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.78);
+  outline-offset: 3px;
+}
+
 @keyframes together-pulse {
   0%, 100% { opacity: 0.45; transform: scale(0.82); }
   50% { opacity: 1; transform: scale(1); }
@@ -98,5 +181,17 @@
 
   .viewer-action.together-action b {
     display: none;
+  }
+
+  .together-invite-card {
+    padding: 1.25rem;
+  }
+
+  .together-invite-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .together-invite-primary {
+    order: -1;
   }
 }

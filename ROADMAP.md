@@ -41,20 +41,23 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 - [x] Automatic WebSocket reconnect with bounded backoff after a temporary network disconnect, plus immediate reconnect attempts on network return and tab/PWA resume.
 - [x] Hostname-based self-hosted Access application active for `naughtyshare.jerryquinet.workers.dev`, with the production `ACCESS_AUD` updated.
 - [x] Production single-device smoke: ordinary video open/play/close stable after hotfix #34; Together joins successfully at `1/2`.
-- [ ] Production two-device smoke: Jerry Windows ↔ Trân Windows.
+- [x] In-app Together invite/attention foundation: lightweight authenticated lobby socket, persistent short-lived invite, FR/VN popup, accept/decline, automatic opening of the invited video and automatic Together join.
+- [ ] Production two-device smoke: Jerry Windows ↔ Trân Windows, including invite popup → auto-open → `2/2`.
 - [ ] Synchronize NEXT / PREVIOUS as explicit room commands rather than relying on each device's local gallery sort/filter state.
 - [ ] Controller modes: Jerry controls / Trân controls / shared control.
 - [ ] Persist explicit Together intent across a fully killed/relaunched PWA session.
-- [ ] Invite/attention mechanism so the second participant does not need to discover the room manually.
+- [ ] System notification / Web Push when NaughtyShare is fully closed or not running.
 
-### First production smoke
+### First production smoke with invite flow
 
-1. Both users authenticate normally on Windows.
-2. Open the same video on both devices.
-3. Both join Together and confirm `2/2` presence.
-4. Jerry tests play → pause → seek; Trân follows.
-5. Trân tests play → pause → seek; Jerry follows.
-6. Leave/rejoin once and confirm presence cleanup + reconnect.
+1. Both users authenticate normally on Windows; Trân can remain anywhere in NaughtyShare and does not need to find the same video.
+2. Jerry opens a working video and clicks `Regarder ensemble`.
+3. Trân receives the Together popup and clicks `Tham gia`.
+4. NaughtyShare opens the invited video automatically on Trân's device and joins Together automatically.
+5. Confirm `2/2` presence on both devices.
+6. Jerry tests play → pause → seek; Trân follows.
+7. Trân tests play → pause → seek; Jerry follows.
+8. Leave/rejoin once and confirm presence cleanup + reconnect.
 
 ## Phase 7 — NaughtyCall — AFTER TOGETHER SMOKE
 
@@ -69,7 +72,7 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 
 ## Phase 8 — couple polish
 
-- [ ] One-tap private invitation to the authenticated partner.
+- [ ] One-tap private invitation to the authenticated partner when the app is closed, via system notification / Web Push.
 - [ ] Presence (`online`, `in room`, `catching up`).
 - [ ] Lightweight reactions such as ❤️ 🔥 😈 without interrupting playback.
 - [ ] Rejoin the active Together session after app/PWA resume.
@@ -77,4 +80,4 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 
 ## Ordering rule
 
-**Together Rooms Windows two-device smoke → NaughtyCall → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
+**Together invite popup smoke → Together Rooms Windows two-device smoke → NaughtyCall → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
