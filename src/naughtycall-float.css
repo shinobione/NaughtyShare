@@ -1,0 +1,102 @@
+/* Floating NaughtyCall UX: keep the call above the modal viewer and make it draggable. */
+
+.naughtycall-shell {
+  z-index: 10050;
+}
+
+.naughtycall-drag-handle {
+  position: absolute;
+  z-index: 8;
+  top: 0.45rem;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 2.8rem;
+  height: 1.35rem;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  background: rgba(5, 5, 9, 0.72);
+  color: rgba(255, 255, 255, 0.72);
+  cursor: grab;
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+  backdrop-filter: blur(10px);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.naughtycall-drag-handle:hover {
+  color: #fff;
+  border-color: rgba(255, 101, 180, 0.42);
+  background: rgba(18, 13, 22, 0.88);
+}
+
+.naughtycall-shell.is-dragging .naughtycall-drag-handle {
+  cursor: grabbing;
+}
+
+.naughtycall-shell.is-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.naughtycall-fullscreen-action {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(255,255,255,.04);
+  color: #d7cfd7;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.naughtycall-fullscreen-action:hover {
+  border-color: rgba(255,255,255,.2);
+  background: rgba(255,255,255,.07);
+  color: #fff;
+}
+
+/* Native Chromium fullscreen only promotes the <video>, which would hide the
+   floating call. NaughtyShare provides a viewer-level fullscreen button instead. */
+video.viewer-media::-webkit-media-controls-fullscreen-button {
+  display: none !important;
+}
+
+.viewer-shell:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  background: #050509;
+}
+
+.viewer-shell:fullscreen .viewer-stage {
+  min-height: 0;
+}
+
+.viewer-shell:fullscreen .viewer-media {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.viewer-shell:fullscreen .naughtycall-shell {
+  z-index: 10050;
+}
+
+@media (max-width: 760px) {
+  .naughtycall-drag-handle {
+    top: 0.35rem;
+    width: 2.5rem;
+    height: 1.2rem;
+  }
+}
