@@ -54,6 +54,24 @@ async function validateTogetherInviteWrapper() {
   requireMatch(/"TogetherInviteRoom"\s*:\s*\{[\s\S]*?"type"\s*:\s*"durable-object"[\s\S]*?"storage"\s*:\s*"sqlite"/, 'TogetherInviteRoom must use declarative SQLite Durable Object storage');
 }
 
+async function validateNaughtyCallWrapper() {
+  const wrapper = await readFile(new URL('../worker/naughtycall.js', import.meta.url), 'utf8');
+  const markers = [
+    [/import\s+togetherInviteWorker,\s*\{\s*TogetherRoom,\s*TogetherInviteRoom\s*\}\s+from\s+['"]\.\/together-invite\.js['"]/, 'NaughtyCall wrapper must import and re-export Together Durable Objects'],
+    [/export\s+class\s+NaughtyCallRoom\s+extends\s+DurableObject/, 'NaughtyCallRoom must be exported as a Durable Object class'],
+    [/async\s+function\s+authenticateViaTogetherInvite\s*\(/, 'NaughtyCall routes must reuse the authenticated Together invite/media/v1 chain'],
+    [/url\.pathname\s*===\s*['"]\/api\/naughtycall\/ws['"]/, 'NaughtyCall wrapper must expose the authenticated signaling WebSocket endpoint'],
+    [/url\.pathname\s*===\s*['"]\/api\/naughtycall\/ice['"]/, 'NaughtyCall wrapper must expose the authenticated ICE configuration endpoint'],
+    [/return\s+togetherInviteWorker\.fetch\(request,\s*env,\s*ctx\)\s*;/, 'NaughtyCall wrapper must delegate unmatched requests to Together invite'],
+  ];
+  for (const [pattern, message] of markers) {
+    if (!pattern.test(wrapper)) failures.push(message);
+  }
+
+  requireMatch(/"name"\s*:\s*"NAUGHTYCALL_ROOMS"[\s\S]*?"class_name"\s*:\s*"NaughtyCallRoom"/, 'NAUGHTYCALL_ROOMS Durable Object binding is required');
+  requireMatch(/"NaughtyCallRoom"\s*:\s*\{[\s\S]*?"type"\s*:\s*"durable-object"[\s\S]*?"storage"\s*:\s*"sqlite"/, 'NaughtyCallRoom must use declarative SQLite Durable Object storage');
+}
+
 requireMatch(/"preview_urls"\s*:\s*false/, 'preview_urls must be explicitly false');
 requireMatch(/"run_worker_first"\s*:\s*true/, 'assets.run_worker_first must be true so authentication gates the PWA shell');
 
@@ -71,6 +89,11 @@ if (!workerEntry) {
   await validateMediaPocWrapper();
   await validateTogetherWrapper();
   await validateTogetherInviteWrapper();
+} else if (workerEntry === 'worker/naughtycall.js') {
+  await validateMediaPocWrapper();
+  await validateTogetherWrapper();
+  await validateTogetherInviteWrapper();
+  await validateNaughtyCallWrapper();
 } else {
   failures.push(`worker entry ${workerEntry} is not an approved production entrypoint`);
 }
