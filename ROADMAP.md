@@ -60,7 +60,7 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 7. [x] Trân tests play → pause → seek; Jerry follows.
 8. [x] Leave/rejoin once and confirm presence cleanup + reconnect.
 
-## Phase 7 — NaughtyCall — MVP IMPLEMENTED / PRODUCTION SMOKE PENDING
+## Phase 7 — NaughtyCall — MVP DEPLOYED / PRODUCTION SMOKE IN PROGRESS
 
 Goal: add a private two-person audio/video call that stays completely separate from Together media playback. The watched NaughtyShare video still plays locally on each device; WebRTC carries only microphone/camera media.
 
@@ -75,25 +75,42 @@ Goal: add a private two-person audio/video call that stays completely separate f
 - [x] Authenticated `/api/naughtycall/ice` endpoint prepared for optional short-lived Cloudflare TURN credentials via `TURN_KEY_ID` + `TURN_KEY_API_TOKEN`; STUN fallback remains automatic when TURN is not configured.
 - [x] Floating remote-camera tile that sits independently over NaughtyShare / Together playback.
 - [x] Local self-preview.
-- [x] Mute, camera toggle, audio-only fallback and hang-up controls.
+- [x] Mute, camera toggle, audio-only fallback and hang-up controls implemented.
 - [x] No call recording.
-- [ ] Production smoke Jerry Windows ↔ Trân Windows: call → accept → two-way audio/video → mute → camera off/on → hang-up.
-- [ ] Add Cloudflare TURN production credentials if the direct P2P smoke reveals NAT/firewall failures.
-- [ ] Draggable / resizable / hideable in-app PiP tile.
+- [x] Reliable browser media-permission preflight added before call setup, with audio-only fallback when camera acquisition fails.
+- [x] Production security-header fix: `Permissions-Policy` now allows `camera=(self)` and `microphone=(self)` while keeping `geolocation=()` disabled; this removed the `NotAllowedError` / no-prompt failure.
+- [x] Production Jerry Windows ↔ Trân Windows basic call smoke: call connects and both users can see and hear each other.
+- [x] Draggable floating NaughtyCall overlay implemented with remembered position and viewport clamping.
+- [x] Viewer top-layer integration implemented so NaughtyCall is re-parented into the modal media viewer instead of falling behind the `<dialog>`.
+- [x] NaughtyShare-managed viewer fullscreen implemented so video + NaughtyCall can remain visible together; native video-only fullscreen is suppressed in Chromium and double-click routes to the managed fullscreen.
+- [x] Floating-overlay/fullscreen polish deployed GREEN to production via PR #39.
+- [ ] Production control smoke: mute/unmute → camera off/on → hang-up on both sides.
+- [ ] Production floating-overlay smoke: open a video during an active call and confirm NaughtyCall stays above the viewer.
+- [ ] Production drag smoke: move NaughtyCall to another corner, confirm it remains usable and position persists.
+- [ ] Production managed-fullscreen smoke: enter fullscreen, confirm NaughtyCall remains visible and draggable, exit fullscreen and confirm the call stays connected.
+- [ ] Production combined smoke: NaughtyCall + Together at `2/2` simultaneously, with bidirectional play/pause/seek still working independently of the call.
+- [ ] Add Cloudflare TURN production credentials only if the direct P2P smoke reveals NAT/firewall failures.
+- [ ] Add resize / hide-collapse controls to the in-app floating tile if useful after real couple use.
 - [ ] Use system Picture in Picture where supported, with in-app PiP as fallback.
 - [ ] Optional call recovery after full page/PWA reload.
 - [ ] Re-evaluate Cloudflare Realtime SFU only if future requirements go beyond the two-person P2P use case.
 
-### First NaughtyCall production smoke
+### NaughtyCall production smoke — resume later with Trân
 
-1. Jerry and Trân both leave NaughtyShare open on Windows.
-2. Jerry clicks `Appeler`; browser camera/micro permission is granted.
-3. Trân receives `NaughtyCall ❤️` and clicks `Chấp nhận`.
-4. Confirm remote camera + two-way audio on both devices.
-5. Test mute/unmute on both sides.
-6. Test camera off/on on both sides; audio must continue while camera is off.
-7. Keep Together video playback running during the call and confirm play/pause/seek still works independently.
-8. Hang up from each side once and confirm clean teardown.
+Trân went to sleep after the first successful two-way audio/video call. Resume this smoke later; do not treat the remaining items as failed.
+
+1. [x] Jerry and Trân both open NaughtyShare on Windows.
+2. [x] Jerry clicks `Appeler`; camera/micro access succeeds after the production `Permissions-Policy` fix.
+3. [x] Trân receives `NaughtyCall ❤️` and accepts.
+4. [x] Confirm remote camera + two-way audio on both devices.
+5. [ ] Test mute/unmute on both sides.
+6. [ ] Test camera off/on on both sides; audio must continue while camera is off.
+7. [ ] Open a NaughtyShare video during the active call; NaughtyCall must remain visible above the viewer.
+8. [ ] Drag the NaughtyCall tile to another corner and confirm the position remains stable.
+9. [ ] Use the managed `⛶` viewer fullscreen; NaughtyCall must stay visible and draggable over the fullscreen viewer.
+10. [ ] Exit fullscreen and close the viewer; the call must remain connected and return cleanly to the normal page overlay.
+11. [ ] Start Together during the active call, reach `2/2`, and confirm bidirectional play/pause/seek still works while audio/video call remains live.
+12. [ ] Hang up from each side once and confirm clean teardown.
 
 ## Phase 8 — couple polish
 
@@ -105,4 +122,4 @@ Goal: add a private two-person audio/video call that stays completely separate f
 
 ## Ordering rule
 
-**NaughtyCall production smoke → NaughtyCall PiP polish → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
+**Finish NaughtyCall production smoke with Trân → validate floating/fullscreen overlay → validate NaughtyCall + Together simultaneous use → decide resize/hide/system-PiP polish → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
