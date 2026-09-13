@@ -1,0 +1,268 @@
+.naughtycall-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.4rem;
+  padding: 0.52rem 0.78rem;
+  border: 1px solid rgba(255, 101, 180, 0.42);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 78, 154, 0.16), rgba(150, 90, 255, 0.13));
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.naughtycall-start:disabled {
+  opacity: 0.58;
+  cursor: default;
+}
+
+.naughtycall-start span {
+  color: #ff65b4;
+  font-size: 0.88rem;
+}
+
+.naughtycall-start b {
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+}
+
+.naughtycall-incoming {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(5, 5, 10, 0.82);
+  backdrop-filter: blur(18px);
+}
+
+.naughtycall-incoming[hidden] {
+  display: none !important;
+}
+
+.naughtycall-incoming-card {
+  width: min(92vw, 28rem);
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 101, 180, 0.34);
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 78, 154, 0.18), transparent 52%),
+    rgba(12, 12, 18, 0.98);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.naughtycall-avatar {
+  display: grid;
+  place-items: center;
+  width: 4.4rem;
+  height: 4.4rem;
+  margin: 0 auto 1rem;
+  border: 1px solid rgba(255, 101, 180, 0.44);
+  border-radius: 50%;
+  background: rgba(255, 101, 180, 0.12);
+  color: #ff65b4;
+  font-size: 2rem;
+  box-shadow: 0 0 35px rgba(255, 78, 154, 0.16);
+}
+
+.naughtycall-incoming-card h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 1.5rem;
+}
+
+.naughtycall-incoming-card p {
+  margin: 0.55rem 0 1.3rem;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.naughtycall-incoming-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.naughtycall-incoming-actions button {
+  min-height: 3rem;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.naughtycall-decline {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.naughtycall-accept {
+  border: 1px solid rgba(255, 101, 180, 0.58);
+  background: linear-gradient(135deg, #ff4e9a, #9b5cff);
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(255, 78, 154, 0.22);
+}
+
+.naughtycall-shell {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 950;
+  width: min(28vw, 22rem);
+  min-width: 17rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 1.25rem;
+  background: rgba(9, 9, 14, 0.97);
+  box-shadow: 0 20px 75px rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(18px);
+}
+
+.naughtycall-shell[hidden] {
+  display: none !important;
+}
+
+.naughtycall-video-wrap {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 78, 154, 0.13), transparent 50%),
+    #08080c;
+}
+
+.naughtycall-remote {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #050508;
+}
+
+.naughtycall-remote[hidden] {
+  display: none;
+}
+
+.naughtycall-audio-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.5rem;
+  background: radial-gradient(circle, rgba(255, 78, 154, 0.14), transparent 55%);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.naughtycall-audio-placeholder[hidden] {
+  display: none !important;
+}
+
+.naughtycall-audio-placeholder span {
+  color: #ff65b4;
+  font-size: 2.2rem;
+}
+
+.naughtycall-audio-placeholder b {
+  font-size: 0.8rem;
+}
+
+.naughtycall-local {
+  position: absolute;
+  right: 0.6rem;
+  top: 0.6rem;
+  width: 28%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 0.8rem;
+  background: #111;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.35);
+}
+
+.naughtycall-status {
+  position: absolute;
+  left: 50%;
+  bottom: 0.6rem;
+  max-width: calc(100% - 1.2rem);
+  transform: translateX(-50%);
+  padding: 0.4rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(5, 5, 9, 0.82);
+  color: #fff;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  backdrop-filter: blur(12px);
+}
+
+.naughtycall-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+  padding: 0.65rem;
+}
+
+.naughtycall-control {
+  min-height: 2.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.naughtycall-control[aria-pressed='true'] {
+  border-color: rgba(246, 188, 98, 0.55);
+  background: rgba(246, 188, 98, 0.14);
+}
+
+.naughtycall-control:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.naughtycall-hangup {
+  border-color: rgba(255, 85, 102, 0.52);
+  background: rgba(255, 85, 102, 0.16);
+}
+
+@media (max-width: 760px) {
+  .naughtycall-start b {
+    display: none;
+  }
+
+  .naughtycall-shell {
+    right: 0.55rem;
+    bottom: 0.55rem;
+    width: min(48vw, 17rem);
+    min-width: 12.5rem;
+    border-radius: 1rem;
+  }
+
+  .naughtycall-local {
+    width: 32%;
+  }
+
+  .naughtycall-status {
+    max-width: calc(100% - 0.8rem);
+    font-size: 0.66rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .naughtycall-shell {
+    width: calc(100vw - 1rem);
+  }
+
+  .naughtycall-incoming-actions {
+    grid-template-columns: 1fr;
+  }
+}

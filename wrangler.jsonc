@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "naughtyshare",
-  "main": "worker/together-invite.js",
+  "main": "worker/naughtycall.js",
   "compatibility_date": "2026-08-18",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
@@ -44,6 +44,10 @@
       {
         "name": "TOGETHER_INVITES",
         "class_name": "TogetherInviteRoom"
+      },
+      {
+        "name": "NAUGHTYCALL_ROOMS",
+        "class_name": "NaughtyCallRoom"
       }
     ]
   },
@@ -53,6 +57,10 @@
       "storage": "sqlite"
     },
     "TogetherInviteRoom": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "NaughtyCallRoom": {
       "type": "durable-object",
       "storage": "sqlite"
     }
