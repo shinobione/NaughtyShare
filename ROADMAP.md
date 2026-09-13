@@ -60,16 +60,40 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 7. [x] Trân tests play → pause → seek; Jerry follows.
 8. [x] Leave/rejoin once and confirm presence cleanup + reconnect.
 
-## Phase 7 — NaughtyCall — NEXT MAJOR SLICE
+## Phase 7 — NaughtyCall — MVP IMPLEMENTED / PRODUCTION SMOKE PENDING
 
-- [ ] Separate WebRTC audio/video call from the watched media stream.
-- [ ] Cloudflare Realtime/SFU integration for microphone and camera.
-- [ ] Floating remote-camera tile over the NaughtyShare video.
+Goal: add a private two-person audio/video call that stays completely separate from Together media playback. The watched NaughtyShare video still plays locally on each device; WebRTC carries only microphone/camera media.
+
+### NaughtyCall P2P MVP
+
+- [x] Dedicated authenticated `NaughtyCallRoom` Durable Object for call signaling; Together room and invite engines remain untouched.
+- [x] Always-on authenticated signaling WebSocket while NaughtyShare is open.
+- [x] Incoming call popup in FR/VN with accept/decline.
+- [x] Outgoing `Appeler / Gọi` control in the global NaughtyShare top bar.
+- [x] Browser WebRTC P2P audio/video with SDP + trickle ICE signaling through the Durable Object.
+- [x] Cloudflare STUN (`stun.cloudflare.com:3478`) as the zero-config default.
+- [x] Authenticated `/api/naughtycall/ice` endpoint prepared for optional short-lived Cloudflare TURN credentials via `TURN_KEY_ID` + `TURN_KEY_API_TOKEN`; STUN fallback remains automatic when TURN is not configured.
+- [x] Floating remote-camera tile that sits independently over NaughtyShare / Together playback.
+- [x] Local self-preview.
+- [x] Mute, camera toggle, audio-only fallback and hang-up controls.
+- [x] No call recording.
+- [ ] Production smoke Jerry Windows ↔ Trân Windows: call → accept → two-way audio/video → mute → camera off/on → hang-up.
+- [ ] Add Cloudflare TURN production credentials if the direct P2P smoke reveals NAT/firewall failures.
 - [ ] Draggable / resizable / hideable in-app PiP tile.
-- [ ] Optional self-preview.
-- [ ] Mute, camera toggle, audio-only mode and hang-up controls.
 - [ ] Use system Picture in Picture where supported, with in-app PiP as fallback.
-- [ ] No call recording by default.
+- [ ] Optional call recovery after full page/PWA reload.
+- [ ] Re-evaluate Cloudflare Realtime SFU only if future requirements go beyond the two-person P2P use case.
+
+### First NaughtyCall production smoke
+
+1. Jerry and Trân both leave NaughtyShare open on Windows.
+2. Jerry clicks `Appeler`; browser camera/micro permission is granted.
+3. Trân receives `NaughtyCall ❤️` and clicks `Chấp nhận`.
+4. Confirm remote camera + two-way audio on both devices.
+5. Test mute/unmute on both sides.
+6. Test camera off/on on both sides; audio must continue while camera is off.
+7. Keep Together video playback running during the call and confirm play/pause/seek still works independently.
+8. Hang up from each side once and confirm clean teardown.
 
 ## Phase 8 — couple polish
 
@@ -81,4 +105,4 @@ Goal: turn the private gallery into a two-person synchronized watch room without
 
 ## Ordering rule
 
-**NaughtyCall → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
+**NaughtyCall production smoke → NaughtyCall PiP polish → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
