@@ -5,6 +5,7 @@ const EDGE_GAP = 8;
 
 let dragState = null;
 let savedPosition = readSavedPosition();
+let dragListenersBound = false;
 
 function lang() {
   return document.documentElement.lang?.toLowerCase().startsWith('vi') ? 'vi' : 'fr';
@@ -138,6 +139,63 @@ function clampCurrentPosition() {
   positionShellAt(rect.left, rect.top);
 }
 
+function beginDrag(event) {
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+  const activeShell = shell();
+  if (!activeShell || activeShell.hidden) return;
+
+  const rect = activeShell.getBoundingClientRect();
+  dragState = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    left: rect.left,
+    top: rect.top,
+  };
+
+  positionShellAt(rect.left, rect.top);
+  activeShell.classList.add('is-dragging');
+  document.documentElement.classList.add('naughtycall-drag-active');
+
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function moveDrag(event) {
+  if (!dragState || event.pointerId !== dragState.pointerId) return;
+
+  positionShellAt(
+    dragState.left + event.clientX - dragState.startX,
+    dragState.top + event.clientY - dragState.startY,
+  );
+
+  if (event.cancelable) event.preventDefault();
+}
+
+function finishDrag(event = null) {
+  if (!dragState) return;
+  if (event?.pointerId != null && event.pointerId !== dragState.pointerId) return;
+
+  shell()?.classList.remove('is-dragging');
+  document.documentElement.classList.remove('naughtycall-drag-active');
+  dragState = null;
+  saveCurrentPosition();
+}
+
+function bindGlobalDragEvents() {
+  if (dragListenersBound) return;
+  dragListenersBound = true;
+
+  // Track the pointer at window level. The handle is intentionally small, and
+  // browser top-layer dialogs/fullscreen can otherwise stop dispatching moves
+  // to the handle as soon as the cursor leaves its bounds.
+  window.addEventListener('pointermove', moveDrag, { capture: true, passive: false });
+  window.addEventListener('pointerup', finishDrag, true);
+  window.addEventListener('pointercancel', finishDrag, true);
+  window.addEventListener('blur', () => finishDrag());
+}
+
 function ensureDragHandle() {
   const call = shell();
   if (!call || call.querySelector('.naughtycall-drag-handle')) return;
@@ -150,44 +208,8 @@ function ensureDragHandle() {
   handle.setAttribute('aria-label', handle.title);
   call.prepend(handle);
 
-  handle.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return;
-    const activeShell = shell();
-    if (!activeShell || activeShell.hidden) return;
-
-    const rect = activeShell.getBoundingClientRect();
-    dragState = {
-      pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
-      left: rect.left,
-      top: rect.top,
-    };
-
-    positionShellAt(rect.left, rect.top);
-    activeShell.classList.add('is-dragging');
-    handle.setPointerCapture?.(event.pointerId);
-    event.preventDefault();
-  });
-
-  handle.addEventListener('pointermove', (event) => {
-    if (!dragState || event.pointerId !== dragState.pointerId) return;
-    positionShellAt(
-      dragState.left + event.clientX - dragState.startX,
-      dragState.top + event.clientY - dragState.startY,
-    );
-    event.preventDefault();
-  });
-
-  const finishDrag = (event) => {
-    if (!dragState || event.pointerId !== dragState.pointerId) return;
-    shell()?.classList.remove('is-dragging');
-    dragState = null;
-    saveCurrentPosition();
-  };
-
-  handle.addEventListener('pointerup', finishDrag);
-  handle.addEventListener('pointercancel', finishDrag);
+  handle.addEventListener('pointerdown', beginDrag);
+  handle.addEventListener('dragstart', (event) => event.preventDefault());
 }
 
 function prepareViewerVideo() {
@@ -287,12 +309,14 @@ function refreshLanguageLabels() {
 }
 
 function init() {
+  bindGlobalDragEvents();
   ensureDragHandle();
   prepareViewerVideo();
   syncOverlayHost();
   observeUi();
 
   document.addEventListener('fullscreenchange', () => {
+    finishDrag();
     syncOverlayHost();
     ensureFullscreenButton();
   });
