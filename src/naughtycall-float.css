@@ -7,38 +7,42 @@
 .naughtycall-drag-handle {
   position: absolute;
   z-index: 8;
-  top: 0.45rem;
+  top: 0.38rem;
   left: 50%;
   display: grid;
   place-items: center;
-  width: 2.8rem;
-  height: 1.35rem;
+  width: 4.2rem;
+  height: 1.65rem;
   transform: translateX(-50%);
   border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 999px;
-  background: rgba(5, 5, 9, 0.72);
-  color: rgba(255, 255, 255, 0.72);
+  background: rgba(5, 5, 9, 0.78);
+  color: rgba(255, 255, 255, 0.78);
   cursor: grab;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 1rem;
   line-height: 1;
   backdrop-filter: blur(10px);
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
+  -webkit-user-drag: none;
 }
 
 .naughtycall-drag-handle:hover {
   color: #fff;
   border-color: rgba(255, 101, 180, 0.42);
-  background: rgba(18, 13, 22, 0.88);
+  background: rgba(18, 13, 22, 0.92);
 }
 
-.naughtycall-shell.is-dragging .naughtycall-drag-handle {
-  cursor: grabbing;
+.naughtycall-shell.is-dragging .naughtycall-drag-handle,
+html.naughtycall-drag-active,
+html.naughtycall-drag-active * {
+  cursor: grabbing !important;
 }
 
-.naughtycall-shell.is-dragging {
+.naughtycall-shell.is-dragging,
+html.naughtycall-drag-active {
   user-select: none;
   -webkit-user-select: none;
 }
@@ -95,8 +99,8 @@ video.viewer-media::-webkit-media-controls-fullscreen-button {
 
 @media (max-width: 760px) {
   .naughtycall-drag-handle {
-    top: 0.35rem;
-    width: 2.5rem;
-    height: 1.2rem;
+    top: 0.3rem;
+    width: 3.7rem;
+    height: 1.45rem;
   }
 }
