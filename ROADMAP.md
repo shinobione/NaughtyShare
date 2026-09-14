@@ -84,9 +84,9 @@ Goal: add a private two-person audio/video call that stays completely separate f
 - [x] Viewer top-layer integration implemented so NaughtyCall is re-parented into the modal media viewer instead of falling behind the `<dialog>`.
 - [x] NaughtyShare-managed viewer fullscreen implemented so video + NaughtyCall can remain visible together; native video-only fullscreen is suppressed in Chromium and double-click routes to the managed fullscreen.
 - [x] Floating-overlay/fullscreen polish deployed GREEN to production via PR #39.
+- [x] Production floating-overlay smoke: during an active call, opening a NaughtyShare video keeps NaughtyCall visibly above the viewer.
+- [x] Production drag smoke: after PR #40 global pointer tracking and PR #41 snapback fix, slow/normal dragging is smooth, position is stable, and the behavior is user-approved in production.
 - [ ] Production control smoke: mute/unmute → camera off/on → hang-up on both sides.
-- [ ] Production floating-overlay smoke: open a video during an active call and confirm NaughtyCall stays above the viewer.
-- [ ] Production drag smoke: move NaughtyCall to another corner, confirm it remains usable and position persists.
 - [ ] Production managed-fullscreen smoke: enter fullscreen, confirm NaughtyCall remains visible and draggable, exit fullscreen and confirm the call stays connected.
 - [ ] Production combined smoke: NaughtyCall + Together at `2/2` simultaneously, with bidirectional play/pause/seek still working independently of the call.
 - [ ] Add Cloudflare TURN production credentials only if the direct P2P smoke reveals NAT/firewall failures.
@@ -105,8 +105,8 @@ Trân went to sleep after the first successful two-way audio/video call. Resume 
 4. [x] Confirm remote camera + two-way audio on both devices.
 5. [ ] Test mute/unmute on both sides.
 6. [ ] Test camera off/on on both sides; audio must continue while camera is off.
-7. [ ] Open a NaughtyShare video during the active call; NaughtyCall must remain visible above the viewer.
-8. [ ] Drag the NaughtyCall tile to another corner and confirm the position remains stable.
+7. [x] Open a NaughtyShare video during the active call; NaughtyCall remains visible above the viewer.
+8. [x] Drag the NaughtyCall tile slowly/continuously to another position and confirm it follows normally and the position remains stable.
 9. [ ] Use the managed `⛶` viewer fullscreen; NaughtyCall must stay visible and draggable over the fullscreen viewer.
 10. [ ] Exit fullscreen and close the viewer; the call must remain connected and return cleanly to the normal page overlay.
 11. [ ] Start Together during the active call, reach `2/2`, and confirm bidirectional play/pause/seek still works while audio/video call remains live.
@@ -122,4 +122,4 @@ Trân went to sleep after the first successful two-way audio/video call. Resume 
 
 ## Ordering rule
 
-**Finish NaughtyCall production smoke with Trân → validate floating/fullscreen overlay → validate NaughtyCall + Together simultaneous use → decide resize/hide/system-PiP polish → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
+**Finish NaughtyCall production smoke with Trân → validate managed fullscreen → validate NaughtyCall + Together simultaneous use → decide resize/hide/system-PiP polish → couple polish**, while iPhone universal playback proceeds in parallel and no longer blocks the main product roadmap.
