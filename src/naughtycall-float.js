@@ -6,6 +6,7 @@ const EDGE_GAP = 8;
 let dragState = null;
 let savedPosition = readSavedPosition();
 let dragListenersBound = false;
+let positionSyncFrame = null;
 
 function lang() {
   return document.documentElement.lang?.toLowerCase().startsWith('vi') ? 'vi' : 'fr';
@@ -49,15 +50,32 @@ function desiredHost() {
   return document.body;
 }
 
-function syncOverlayHost() {
-  const host = desiredHost();
-  for (const node of overlayNodes()) {
-    if (node.parentElement !== host) host.append(node);
-  }
-  window.requestAnimationFrame(() => {
+function schedulePositionSync() {
+  if (dragState || positionSyncFrame !== null) return;
+
+  positionSyncFrame = window.requestAnimationFrame(() => {
+    positionSyncFrame = null;
+    if (dragState) return;
     applySavedPosition();
     clampCurrentPosition();
   });
+}
+
+function syncOverlayHost() {
+  const host = desiredHost();
+  let moved = false;
+
+  for (const node of overlayNodes()) {
+    if (node.parentElement !== host) {
+      host.append(node);
+      moved = true;
+    }
+  }
+
+  // Re-apply the persisted position only when the overlay actually changes
+  // host. Unrelated DOM mutations (Together status, playback UI, captions,
+  // etc.) must never fight an active or recently completed drag.
+  if (moved) schedulePositionSync();
 }
 
 function readSavedPosition() {
@@ -132,11 +150,21 @@ function saveCurrentPosition() {
 
 function clampCurrentPosition() {
   const call = shell();
-  if (!call || call.hidden) return;
+  if (!call || call.hidden || dragState) return;
   const rect = call.getBoundingClientRect();
   if (!rect.width || !rect.height) return;
   if (!call.style.left && !call.style.top) return;
   positionShellAt(rect.left, rect.top);
+}
+
+function bindCallVisibility(call) {
+  if (!call || call.dataset.dragVisibilityBound === '1') return;
+  call.dataset.dragVisibilityBound = '1';
+
+  const observer = new MutationObserver(() => {
+    if (!call.hidden) schedulePositionSync();
+  });
+  observer.observe(call, { attributes: true, attributeFilter: ['hidden'] });
 }
 
 function beginDrag(event) {
@@ -144,6 +172,11 @@ function beginDrag(event) {
 
   const activeShell = shell();
   if (!activeShell || activeShell.hidden) return;
+
+  if (positionSyncFrame !== null) {
+    window.cancelAnimationFrame(positionSyncFrame);
+    positionSyncFrame = null;
+  }
 
   const rect = activeShell.getBoundingClientRect();
   dragState = {
@@ -187,9 +220,6 @@ function bindGlobalDragEvents() {
   if (dragListenersBound) return;
   dragListenersBound = true;
 
-  // Track the pointer at window level. The handle is intentionally small, and
-  // browser top-layer dialogs/fullscreen can otherwise stop dispatching moves
-  // to the handle as soon as the cursor leaves its bounds.
   window.addEventListener('pointermove', moveDrag, { capture: true, passive: false });
   window.addEventListener('pointerup', finishDrag, true);
   window.addEventListener('pointercancel', finishDrag, true);
@@ -198,7 +228,10 @@ function bindGlobalDragEvents() {
 
 function ensureDragHandle() {
   const call = shell();
-  if (!call || call.querySelector('.naughtycall-drag-handle')) return;
+  if (!call) return;
+
+  bindCallVisibility(call);
+  if (call.querySelector('.naughtycall-drag-handle')) return;
 
   const handle = document.createElement('button');
   handle.type = 'button';
@@ -313,18 +346,17 @@ function init() {
   ensureDragHandle();
   prepareViewerVideo();
   syncOverlayHost();
+  schedulePositionSync();
   observeUi();
 
   document.addEventListener('fullscreenchange', () => {
     finishDrag();
     syncOverlayHost();
+    schedulePositionSync();
     ensureFullscreenButton();
   });
   document.addEventListener('dblclick', interceptVideoDoubleClick, true);
-  window.addEventListener('resize', () => {
-    if (savedPosition) applySavedPosition();
-    else clampCurrentPosition();
-  });
+  window.addEventListener('resize', () => schedulePositionSync());
 
   const languageObserver = new MutationObserver(refreshLanguageLabels);
   languageObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
